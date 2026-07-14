@@ -1,0 +1,20 @@
+{
+  "name": "hk-hub",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "HK 통합 플랫폼 모노레포 — 허브(학생) + 관리 대시보드 + 공유 패키지. 백엔드는 hk-chess-betting Firebase 공유(무변경).",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:hub": "npm run dev --workspace apps/hub",
+    "dev:admin": "npm run dev --workspace apps/admin"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

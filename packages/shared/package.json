@@ -1,0 +1,15 @@
+{
+  "name": "@hk/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "HK 통합 공유 패키지 — firebase 초기화 / auth(name+PIN) / wallet 구독 / callable 래퍼 / UI킷. 5앱 복붙 통합 대상(STEP 1~).",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "firebase": "^10.14.1",
+    "react": "^18.3.1"
+  }
+}
