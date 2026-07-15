@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { nameToUserId, verifyPin } from '@hk/shared';
 import { isConfigured } from './firebase.js';
-import { fetchUser, watchUser, watchDp, watchMyGigs } from './data.js';
+import { fetchUser, watchUser, watchDp, watchMyGigs, watchMyHoldings, watchStocks, watchMyHelp } from './data.js';
 import { APPS } from './apps.js';
 
 const SESSION_KEY = 'hkhub.session';
@@ -26,6 +26,26 @@ function gigRole(g, uid) {
   if (g.workerId === uid) return '작업자';
   if (Array.isArray(g.applicants) && g.applicants.includes(uid)) return '지원함';
   return '';
+}
+
+// 봉사 상태 라벨.
+const HELP_STATUS = {
+  open: { label: '모집중', cls: 'st-open' },
+  approved: { label: '완료', cls: 'st-done' },
+  closed: { label: '완료', cls: 'st-done' },
+  rejected: { label: '반려', cls: 'st-warn' },
+  cancelled: { label: '취소', cls: 'st-mute' },
+};
+
+function helpRole(h, uid) {
+  if (h.requesterId === uid) return '요청자';
+  if (Array.isArray(h.volunteers) && h.volunteers.includes(uid)) return '봉사자';
+  return '';
+}
+
+// 주식 평가액 = Σ floor(shares) × price (HK_Stock/domain/market.js holdingValue와 동일).
+function portfolioValue(holdings, stocks) {
+  return holdings.reduce((sum, h) => sum + Math.floor(h.shares || 0) * (stocks[h.stockId]?.price || 0), 0);
 }
 
 export default function App() {
@@ -105,15 +125,25 @@ function Dashboard({ session, onLogout }) {
   const [balance, setBalance] = useState(null);
   const [dp, setDp] = useState(null);
   const [gigs, setGigs] = useState([]);
+  const [holdings, setHoldings] = useState([]);
+  const [stocks, setStocks] = useState({});
+  const [help, setHelp] = useState([]);
 
   useEffect(() => {
-    const u1 = watchUser(session.userId, (u) => setBalance(u ? (u.balance || 0) : 0));
-    const u2 = watchDp(session.userId, setDp);
-    const u3 = watchMyGigs(session.userId, setGigs);
-    return () => { u1(); u2(); u3(); };
+    const subs = [
+      watchUser(session.userId, (u) => setBalance(u ? (u.balance || 0) : 0)),
+      watchDp(session.userId, setDp),
+      watchMyGigs(session.userId, setGigs),
+      watchMyHoldings(session.userId, setHoldings),
+      watchStocks(setStocks),
+      watchMyHelp(session.userId, setHelp),
+    ];
+    return () => subs.forEach((u) => u());
   }, [session.userId]);
 
   const activeGigs = gigs.filter((g) => !['confirmed', 'cancelled'].includes(g.status));
+  const stockValue = portfolioValue(holdings, stocks);
+  const netWorth = (balance || 0) + stockValue;
 
   return (
     <div className="wrap">
@@ -131,6 +161,10 @@ function Dashboard({ session, onLogout }) {
             <div className="num">{balance == null ? '…' : balance.toLocaleString()}</div>
           </div>
           <div className="stat">
+            <div className="lab">주식 평가액</div>
+            <div className="num">{holdings.length === 0 ? '0' : stockValue.toLocaleString()}</div>
+          </div>
+          <div className="stat">
             <div className="lab">DP</div>
             <div className="num accent2">{dp == null ? '…' : dp.toLocaleString()}</div>
           </div>
@@ -139,6 +173,7 @@ function Dashboard({ session, onLogout }) {
             <div className="num">{activeGigs.length}</div>
           </div>
         </section>
+        <p className="networth">순자산(포인트+주식) <b>{balance == null ? '…' : netWorth.toLocaleString()}</b></p>
 
         <section className="block">
           <h3>내 의뢰 현황</h3>
@@ -159,6 +194,24 @@ function Dashboard({ session, onLogout }) {
             </ul>
           )}
         </section>
+
+        {help.length > 0 && (
+          <section className="block">
+            <h3>내 봉사 현황</h3>
+            <ul className="gigs">
+              {help.map((h) => {
+                const st = HELP_STATUS[h.status] || { label: h.status, cls: 'st-mute' };
+                return (
+                  <li key={h.id}>
+                    <span className={`badge ${st.cls}`}>{st.label}</span>
+                    <span className="gtitle">{h.title || '(제목 없음)'}</span>
+                    <span className="grole">{helpRole(h, session.userId)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         <section className="block">
           <h3>바로가기</h3>

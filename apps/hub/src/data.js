@@ -35,8 +35,32 @@ export function watchMyGigs(userId, cb) {
   });
 }
 
-// 내 봉사 요청(helpRequests) — 요청자/승인 대기 등.
+// 내가 얽힌 봉사(helpRequests) — 요청자(requesterId) 또는 봉사자(volunteers[]).
 export function watchMyHelp(userId, cb) {
-  return onSnapshot(query(collection(db(), 'helpRequests'), where('userId', '==', userId)),
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(collection(db(), 'helpRequests'), (snap) => {
+    const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const mine = all.filter((h) =>
+      h.requesterId === userId
+      || (Array.isArray(h.volunteers) && h.volunteers.includes(userId)));
+    cb(mine);
+  });
+}
+
+// 내 주식 보유(holdings) — userId 필터. 문서: { userId, stockId, shares, avgCost }.
+export function watchMyHoldings(userId, cb) {
+  return onSnapshot(collection(db(), 'holdings'), (snap) => {
+    const mine = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((h) => h.userId === userId);
+    cb(mine);
+  });
+}
+
+// 종목 시세 맵 { stockId: { price, name } } — 평가액 계산용.
+export function watchStocks(cb) {
+  return onSnapshot(collection(db(), 'stocks'), (snap) => {
+    const map = {};
+    snap.docs.forEach((d) => { const s = d.data(); map[d.id] = { price: s.price || 0, name: s.name || d.id }; });
+    cb(map);
+  });
 }
