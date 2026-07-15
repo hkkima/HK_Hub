@@ -1,0 +1,42 @@
+// 공유 데이터 읽기 — 전부 공개 읽기(rules). 쓰기는 각 앱/함수가 담당, 허브는 읽기만.
+import {
+  doc, collection, getDoc, onSnapshot, query, where,
+} from 'firebase/firestore';
+import { db } from './firebase.js';
+
+// 로그인용: 이름 슬러그로 user 문서 1건 조회(공개 읽기).
+export async function fetchUser(userId) {
+  const snap = await getDoc(doc(db(), 'users', userId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+// 내 포인트(users/{id}.balance) 실시간 구독.
+export function watchUser(userId, cb) {
+  return onSnapshot(doc(db(), 'users', userId),
+    (snap) => cb(snap.exists() ? { id: snap.id, ...snap.data() } : null));
+}
+
+// 내 DP(dpAccounts/{id}.dp) 실시간 구독. 문서 없으면 0.
+export function watchDp(userId, cb) {
+  return onSnapshot(doc(db(), 'dpAccounts', userId),
+    (snap) => cb(snap.exists() ? (snap.data().dp || 0) : 0));
+}
+
+// 내가 얽힌 외주(gigs) — 의뢰자(requesterId) 또는 작업자(workerId) 또는 지원자(applicants).
+// 전체 구독 후 클라에서 필터(gigs 규모가 작음 · 공개 읽기).
+export function watchMyGigs(userId, cb) {
+  return onSnapshot(collection(db(), 'gigs'), (snap) => {
+    const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const mine = all.filter((g) =>
+      g.requesterId === userId
+      || g.workerId === userId
+      || (Array.isArray(g.applicants) && g.applicants.includes(userId)));
+    cb(mine);
+  });
+}
+
+// 내 봉사 요청(helpRequests) — 요청자/승인 대기 등.
+export function watchMyHelp(userId, cb) {
+  return onSnapshot(query(collection(db(), 'helpRequests'), where('userId', '==', userId)),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
