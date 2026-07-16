@@ -1,104 +1,160 @@
+/* ─── HK-UI 공유 골격 + theme-hub 「여권·중앙 발권국」 ───────────────
+   골격(폰트·테두리·라디우스·하드그림자·텍스처)은 5개 앱과 공유. 색만 허브 고유. */
 :root {
-  --bg: #0f1220;
-  --panel: #181c2e;
-  --panel2: #20263d;
-  --line: #2b3350;
-  --ink: #e8ecf7;
-  --muted: #97a0bd;
-  --accent: #6ea8fe;
-  --accent2: #f0b64b;
-  --ok: #58c98a;
-  --warn: #f2765c;
-  --radius: 14px;
+  --font-display: 'Cinzel', 'Noto Serif KR', serif;
+  --font-body: 'Noto Serif KR', 'Pretendard Variable', serif;
+  --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
+
+  --surface-base: #dfe3ee;
+  --surface-raised: #f0f2f8;
+  --surface-sunken: #d3d8e8;
+  --surface-invert: #171b2e;
+  --ink-primary: #1a1f36;
+  --ink-secondary: #5a6180;
+  --ink-on-invert: #e7ebf6;
+  --accent: #2a3a8f;
+  --accent-2: #b8862b;
+  --highlight: #ffd23f;
+  --gain: #9c1f1a;
+  --loss: #3a5b7a;
+  --positive: #4e7a3a;
+
+  --line: #1a1f36;
+  --line-soft: rgba(26, 31, 54, .22);
+  --border: 2px solid var(--line);
+  --radius: 3px;
+  --shadow-hard: 3px 5px 0 rgba(20, 20, 45, .28);
+  --shadow-press: 2px 2px 0 rgba(20, 20, 45, .28);
+  --tex-halftone: radial-gradient(var(--line-soft) 1px, transparent 1.4px);
+  --tex-halftone-size: 7px 7px;
+  --ease-thunk: cubic-bezier(.2, 1.5, .4, 1);
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-a { color: var(--accent); }
-
-.wrap { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
-
-.top {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 4px; position: sticky; top: 0; background: var(--bg);
-  border-bottom: 1px solid var(--line); margin-bottom: 22px; z-index: 5;
-}
-.brand { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.who { display: flex; align-items: center; gap: 12px; }
-.uname { color: var(--muted); font-size: 14px; }
-
-.card {
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: var(--radius); padding: 22px;
-}
-.login { max-width: 380px; margin: 6vh auto 28px; }
-.login h2 { margin: 0 0 4px; }
-.login label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 5px; }
-.login input {
-  width: 100%; padding: 11px 13px; border-radius: 10px;
-  border: 1px solid var(--line); background: var(--panel2); color: var(--ink);
+  background-color: var(--surface-base);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='l'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.5' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23l)' opacity='0.06'/%3E%3C/svg%3E");
+  color: var(--ink-primary);
+  font-family: var(--font-body);
   font-size: 15px;
 }
-.login input:focus { outline: none; border-color: var(--accent); }
+a { color: var(--accent); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-button {
-  cursor: pointer; border-radius: 10px; border: 1px solid var(--line);
-  padding: 10px 16px; font-size: 14px; background: var(--panel2); color: var(--ink);
+.wrap { max-width: 820px; margin: 0 auto; padding: 0 16px 56px; }
+
+/* ── 관인 헤더 (Bureau masthead) ── */
+.masthead {
+  background: var(--surface-invert);
+  color: var(--ink-on-invert);
+  border: var(--border);
+  box-shadow: var(--shadow-hard);
+  margin: 20px 0 26px;
+  padding: 14px 18px;
+  display: flex; align-items: center; gap: 16px;
 }
-button.primary { width: 100%; margin-top: 18px; background: var(--accent); border-color: var(--accent); color: #0b1020; font-weight: 700; }
-button.primary:disabled { opacity: .6; cursor: default; }
-button.ghost { background: transparent; color: var(--muted); }
+.seal { flex: none; }
+.mh-title { flex: 1; }
+.mh-title .ko { font-family: var(--font-display); font-weight: 900; font-size: 22px; letter-spacing: .04em; }
+.mh-title .en { font-family: var(--font-mono); font-size: 10px; letter-spacing: .28em; color: var(--accent-2); text-transform: uppercase; margin-top: 2px; }
+.mh-who { display: flex; align-items: center; gap: 12px; }
+.mh-who .uname { font-family: var(--font-display); font-size: 15px; }
 
-.muted { color: var(--muted); }
-.err { color: var(--warn); font-size: 14px; }
-code { background: var(--panel2); padding: 1px 6px; border-radius: 6px; }
+/* ── 버튼 (하드 오프셋 · thunk) ── */
+button {
+  cursor: pointer; font-family: var(--font-body); font-size: 14px;
+  border: var(--border); border-radius: var(--radius);
+  background: var(--surface-raised); color: var(--ink-primary);
+  padding: 9px 16px; box-shadow: var(--shadow-press);
+  transition: transform 90ms var(--ease-thunk), box-shadow 90ms;
+}
+button:active { transform: translate(2px, 2px); box-shadow: none; }
+button.primary { width: 100%; margin-top: 20px; background: var(--accent); color: #fff; font-family: var(--font-display); font-weight: 700; letter-spacing: .04em; }
+button.primary:disabled { opacity: .55; cursor: default; }
+button.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-on-invert); padding: 6px 8px; }
+button.ghost:active { transform: none; }
 
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 10px; }
-.networth { text-align: right; color: var(--muted); font-size: 13px; margin: 0 4px 26px; }
-.networth b { color: var(--ink); font-variant-numeric: tabular-nums; margin-left: 6px; font-size: 15px; }
-.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
-.stat .lab { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-.stat .num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.num.accent2 { color: var(--accent2); }
+/* ── 로그인(여권 제시) ── */
+.card {
+  background: var(--surface-raised); border: var(--border);
+  box-shadow: var(--shadow-hard); padding: 24px;
+}
+.login { max-width: 400px; margin: 4vh auto 30px; }
+.login h2 { font-family: var(--font-display); font-weight: 700; margin: 0 0 4px; font-size: 22px; }
+.login label { display: block; font-size: 12px; color: var(--ink-secondary); margin: 16px 0 5px; letter-spacing: .02em; }
+.login input {
+  width: 100%; padding: 11px 13px; border: var(--border); border-radius: var(--radius);
+  background: var(--surface-base); color: var(--ink-primary); font-size: 15px; font-family: var(--font-body);
+}
+.login input:focus { outline: none; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4.5px var(--accent-2); }
+
+.muted { color: var(--ink-secondary); }
+.err { color: var(--gain); font-size: 14px; font-weight: 600; }
+code { font-family: var(--font-mono); background: var(--surface-sunken); padding: 1px 6px; border-radius: 2px; }
+
+/* ── 통화면 (Currency ledger) ── */
+.ledger {
+  background: var(--surface-raised); border: var(--border); box-shadow: var(--shadow-hard);
+  padding: 20px 22px; margin-bottom: 26px;
+  background-image: var(--tex-halftone); background-size: var(--tex-halftone-size);
+  background-position: right -6px top -6px; background-repeat: repeat;
+}
+.ledger .cap { font-family: var(--font-mono); font-size: 10px; letter-spacing: .26em; color: var(--ink-secondary); text-transform: uppercase; }
+.ledger .net { font-family: var(--font-mono); font-weight: 700; font-size: 46px; line-height: 1.05; margin: 4px 0 14px; letter-spacing: -.01em; }
+.currencies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.cur { border-top: var(--border); padding-top: 8px; }
+.cur .lab { font-size: 12px; color: var(--ink-secondary); }
+.cur .val { font-family: var(--font-mono); font-weight: 700; font-size: 22px; }
+.cur .val.gold { color: var(--accent-2); }
 
 .block { margin-bottom: 30px; }
-.block h3 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+.block h3 { font-family: var(--font-display); font-weight: 700; font-size: 15px; margin: 0 0 12px; letter-spacing: .03em; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 
-.gigs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.gigs li {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px;
+/* ── 입국 도장 (Entry stamps) ── */
+.stamps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.stamps li {
+  display: flex; align-items: center; gap: 11px;
+  background: var(--surface-raised); border: var(--border); box-shadow: var(--shadow-press);
+  padding: 10px 13px;
 }
-.gtitle { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.grole { font-size: 12px; color: var(--muted); }
-.greward { font-variant-numeric: tabular-nums; color: var(--accent2); font-size: 14px; }
-
-.badge { font-size: 12px; padding: 3px 9px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
-.st-open { background: #22304e; color: var(--accent); }
-.st-go   { background: #143726; color: var(--ok); }
-.st-wait { background: #3a3320; color: var(--accent2); }
-.st-done { background: #1f2740; color: var(--muted); }
-.st-warn { background: #3e2018; color: var(--warn); }
-.st-mute { background: #222840; color: var(--muted); }
-
-.launcher { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-.applink {
-  display: flex; align-items: center; gap: 13px; text-decoration: none; color: var(--ink);
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
-  transition: border-color .15s, transform .15s;
+.stitle { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srole { font-family: var(--font-mono); font-size: 11px; color: var(--ink-secondary); }
+.stamp {
+  font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: .05em;
+  padding: 3px 8px; border: 1.5px solid currentColor; border-radius: 2px;
+  transform: rotate(-4deg); white-space: nowrap;
 }
-.applink:hover { border-color: var(--accent); transform: translateY(-2px); }
-.aemoji { font-size: 26px; }
-.ainfo { display: flex; flex-direction: column; }
-.aname { font-weight: 700; }
-.adesc { font-size: 12px; color: var(--muted); }
+.stamp.s-open { color: var(--accent); }
+.stamp.s-go { color: var(--positive); }
+.stamp.s-done { color: var(--ink-secondary); }
+.stamp.s-warn { color: var(--gain); }
+.stamp.s-mute { color: var(--ink-secondary); }
 
-@media (max-width: 520px) {
-  .stats { grid-template-columns: 1fr 1fr; }
+/* ── 홀 디렉토리 (Visa directory) — 각 홀을 그 홀 고유색으로 ── */
+.directory { display: flex; flex-direction: column; gap: 10px; }
+.hall {
+  display: flex; align-items: center; gap: 13px; text-decoration: none; color: var(--ink-primary);
+  background: var(--surface-raised); border: var(--border); box-shadow: var(--shadow-press);
+  padding: 12px 14px; border-left-width: 7px; border-left-color: var(--hall);
+  transition: transform 90ms var(--ease-thunk), box-shadow 90ms;
+}
+.hall:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-hard); }
+.hall:active { transform: translate(2px, 2px); box-shadow: none; }
+.hall-seal {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  border: 2px solid var(--hall); color: var(--hall);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 900; font-size: 15px;
+}
+.hall-info { display: flex; flex-direction: column; line-height: 1.25; }
+.hall-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.hall-desc { font-size: 12px; color: var(--ink-secondary); }
+.emptyline { color: var(--ink-secondary); font-size: 14px; }
+
+@media (max-width: 620px) {
+  .cols { grid-template-columns: 1fr; }
+  .currencies { grid-template-columns: 1fr; }
 }
