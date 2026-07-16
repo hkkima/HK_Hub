@@ -101,6 +101,13 @@ code { font-family: var(--font-mono); background: var(--surface-sunken); padding
   background-image: var(--tex-halftone); background-size: var(--tex-halftone-size);
   background-position: right -6px top -6px; background-repeat: repeat;
 }
+/* 소제목은 halftone 점무늬 위에 흰 하이라이트로 knockout — 가독성 확보 */
+.ledger .cap,
+.cur .lab {
+  display: inline-block;
+  background: #fff;
+  box-shadow: 0 0 0 2.5px #fff;
+}
 .ledger .cap { font-family: var(--font-mono); font-size: 10px; letter-spacing: .26em; color: var(--ink-secondary); text-transform: uppercase; }
 .ledger .net { font-family: var(--font-mono); font-weight: 700; font-size: 46px; line-height: 1.05; margin: 4px 0 14px; letter-spacing: -.01em; }
 .currencies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
