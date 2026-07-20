@@ -77,6 +77,8 @@ function Masthead({ session, onLogout }) {
 
 export default function App() {
   const [session, setSession] = useState(loadSession);
+  // 탭은 App 레벨 — 운영자는 학생 로그인(이름+PIN) 없이도 [관리]로 바로 갈 수 있어야 한다.
+  const [view, setView] = useState('home');
 
   const logout = useCallback(() => { localStorage.removeItem(SESSION_KEY); setSession(null); }, []);
   const login = useCallback((s) => { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); setSession(s); }, []);
@@ -88,9 +90,27 @@ export default function App() {
       </div>
     );
   }
-  return session
-    ? <Dashboard session={session} onLogout={logout} />
-    : <Login onLogin={login} />;
+
+  return (
+    <div className="wrap">
+      <Masthead session={session} onLogout={logout} />
+      <nav className="tabs">
+        {[['home', '홈'], ['company', '내 회사'], ['admin', '관리']].map(([k, label]) => (
+          <button key={k} className={view === k ? 'tab on' : 'tab'} onClick={() => setView(k)}>{label}</button>
+        ))}
+      </nav>
+
+      {view === 'admin' && <AdminPage />}
+
+      {view === 'company' && (session
+        ? <CompanyPage session={session} />
+        : <div className="block"><h3>내 회사</h3><p className="emptyline">먼저 [홈]에서 여권(이름+PIN)을 제시해 주세요.</p></div>)}
+
+      {view === 'home' && (session
+        ? <HomeView session={session} />
+        : <Login onLogin={login} />)}
+    </div>
+  );
 }
 
 function Login({ onLogin }) {
@@ -115,8 +135,7 @@ function Login({ onLogin }) {
   }
 
   return (
-    <div className="wrap">
-      <Masthead />
+    <>
       <form className="card login" onSubmit={submit}>
         <h2>여권 제시</h2>
         <p className="muted">증권가·베팅판과 같은 이름 + PIN으로 입국해요.</p>
@@ -131,12 +150,11 @@ function Login({ onLogin }) {
         <h3>홀 디렉토리</h3>
         <Directory />
       </div>
-    </div>
+    </>
   );
 }
 
-function Dashboard({ session, onLogout }) {
-  const [view, setView] = useState('home');
+function HomeView({ session }) {
   const [balance, setBalance] = useState(null);
   const [dp, setDp] = useState(null);
   const [gigs, setGigs] = useState([]);
@@ -164,19 +182,7 @@ function Dashboard({ session, onLogout }) {
   ];
 
   return (
-    <div className="wrap">
-      <Masthead session={session} onLogout={onLogout} />
-
-      <nav className="tabs">
-        {[['home', '홈'], ['company', '내 회사'], ['admin', '관리']].map(([k, label]) => (
-          <button key={k} className={view === k ? 'tab on' : 'tab'} onClick={() => setView(k)}>{label}</button>
-        ))}
-      </nav>
-
-      {view === 'company' && <CompanyPage session={session} />}
-      {view === 'admin' && <AdminPage />}
-
-      {view === 'home' && (<>
+    <>
       <section className="ledger">
         <div className="cap">순자산 · Net Worth</div>
         <div className="net">{balance == null ? '…' : netWorth.toLocaleString()}</div>
@@ -210,8 +216,7 @@ function Dashboard({ session, onLogout }) {
           <Directory />
         </div>
       </div>
-      </>)}
-    </div>
+    </>
   );
 }
 
