@@ -92,12 +92,49 @@ export function watchTeamLedger(stockId, cb) {
   );
 }
 
+// 교환소 가격표(meta/corpServices) — 운영자가 setCorpServices 로 설정.
+export function watchCorpServices(cb) {
+  return onSnapshot(doc(db(), 'meta', 'corpServices'),
+    (snap) => cb(snap.exists() ? (snap.data().services || {}) : {}),
+    (e) => { console.warn('가격표 구독 실패:', e.code); cb({}); });
+}
+
+// 팀 주문 현황(공개 — 팀원도 본다). 최근 30건. where 만 쓰고 정렬은 클라에서(색인 불필요).
+export function watchCorpOrders(stockId, cb) {
+  return onSnapshot(
+    query(collection(db(), 'corpOrders'), where('stockId', '==', stockId)),
+    (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => (b.ts?.seconds || 0) - (a.ts?.seconds || 0));
+      cb(rows.slice(0, 30));
+    },
+    (e) => { console.warn('주문 구독 실패:', e.code); cb([]); },
+  );
+}
+
+// 운영자용 — 전체 대기 주문(승인/거부 큐).
+export function watchPendingCorpOrders(cb) {
+  return onSnapshot(
+    query(collection(db(), 'corpOrders'), where('status', '==', 'pending')),
+    (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => (a.ts?.seconds || 0) - (b.ts?.seconds || 0)); // 오래된 것 먼저
+      cb(rows);
+    },
+    (e) => { console.warn('대기 주문 구독 실패:', e.code); cb([]); },
+  );
+}
+
 // CEO 집행(익명인증) — 함수가 stocks.ceoUserId + PIN 검증.
 export const paySalary = callable('paySalary');
 export const payBonus = callable('payBonus');
 export const payTeamDividend = callable('payTeamDividend');
+export const redeemCorpService = callable('redeemCorpService');
 // 운영자 집행(Google 로그인 필요) — assertAdmin. 상장 자체는 HK_Stock 관리자에서.
 export const grantTeamPoints = callable('grantTeamPoints', { needAnon: false });
+export const fulfillCorpOrder = callable('fulfillCorpOrder', { needAnon: false });
+export const rejectCorpOrder = callable('rejectCorpOrder', { needAnon: false });
+export const setCorpServices = callable('setCorpServices', { needAnon: false });
 
 // 종목 시세 맵 { stockId: { price, name } } — 평가액 계산용.
 export function watchStocks(cb) {

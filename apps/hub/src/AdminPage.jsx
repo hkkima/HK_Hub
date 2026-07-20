@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { signInWithGoogle, watchAuth, isAdminEmail } from './firebase.js';
-import { watchTeams, watchAllUsers, grantTeamPoints } from './data.js';
+import {
+  watchTeams, watchAllUsers, watchPendingCorpOrders,
+  grantTeamPoints, fulfillCorpOrder, rejectCorpOrder,
+} from './data.js';
 
 // ★팀 = 주식★ — 상장(팀 생성)·대표/팀원 지정은 HK_Stock 관리자 화면에서 한다(upsertStock).
 //   여기서는 팀 금고(stocks.corpBalance) 충전과 현황만 다룬다.
@@ -8,17 +11,19 @@ export default function AdminPage() {
   const [gUser, setGUser] = useState(null);
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
+  const [pending, setPending] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
   useEffect(() => {
     const off = watchAuth(setGUser);
-    const subs = [watchTeams(setTeams), watchAllUsers(setUsers)];
+    const subs = [watchTeams(setTeams), watchAllUsers(setUsers), watchPendingCorpOrders(setPending)];
     return () => { off?.(); subs.forEach((u) => u()); };
   }, []);
 
   const isAdmin = gUser && !gUser.isAnonymous && isAdminEmail(gUser.email);
   const nameOf = (id) => users.find((u) => u.id === id)?.name || id;
+  const teamName = (id) => teams.find((t) => t.id === id)?.name || id;
   const [g, setG] = useState({ stockId: '', amount: '', memo: '', source: 'house' });
 
   async function run(fn, okText) {
@@ -74,6 +79,35 @@ export default function AdminPage() {
           ).then(() => setG({ ...g, amount: '', memo: '' }))}>
           충전
         </button>
+      </section>
+
+      <section className="block">
+        <h3>교환소 주문 큐 ({pending.length})</h3>
+        <p className="muted" style={{ marginBottom: 10 }}>
+          납품이 끝나면 <b>이행 완료</b>, 들어줄 수 없으면 <b>거부</b>하세요.
+          거부하면 대금이 <b>팀 금고로 환불</b>됩니다(소각 되돌리기).
+        </p>
+        {pending.length === 0 && <p className="emptyline">대기 중인 주문이 없어요.</p>}
+        {pending.map((o) => (
+          <div className="payrow" key={o.id}>
+            <span className="pname">
+              {teamName(o.stockId)} · <b>{o.serviceName || o.service}</b>
+              {o.params?.note ? <span className="muted"> — {o.params.note}</span> : null}
+            </span>
+            <span className="pnet mono">{(o.cost || 0).toLocaleString()}</span>
+            <button disabled={busy}
+              onClick={() => run(() => fulfillCorpOrder({ orderId: o.id }), () => '이행 완료 처리됨')}>완료</button>
+            <button disabled={busy}
+              onClick={() => {
+                const reason = window.prompt('거부 사유 (팀에게 공개됩니다)');
+                if (reason === null) return null;
+                return run(
+                  () => rejectCorpOrder({ orderId: o.id, reason }),
+                  (r) => `거부 — ${r.refund.toLocaleString()} 환불됨`,
+                );
+              }}>거부</button>
+          </div>
+        ))}
       </section>
 
       <section className="block">

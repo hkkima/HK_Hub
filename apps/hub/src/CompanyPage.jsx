@@ -1,5 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
-import { watchTeams, watchAllUsers, watchTeamLedger, paySalary, payBonus, payTeamDividend } from './data.js';
+import {
+  watchTeams, watchAllUsers, watchTeamLedger, watchCorpServices, watchCorpOrders,
+  paySalary, payBonus, payTeamDividend, redeemCorpService,
+} from './data.js';
+
+const TIER_LABEL = {
+  T1: 'T1 · 까미 노동',
+  T2: 'T2 · 강사 직접',
+  T3: 'T3 · 까미 비전스 계약',
+};
+const ORDER_LABEL = { pending: '대기', fulfilled: '완료', rejected: '거부' };
+const ORDER_BADGE = { pending: 'st-open', fulfilled: 'st-done', rejected: 'st-off' };
 
 const TAX_PCT = 10;       // 주급 소득세(함수 SALARY_TAX_BPS 와 동일)
 const BONUS_TAX_PCT = 15; // 상여 소득세(함수 BONUS_TAX_BPS 와 동일)
@@ -21,22 +32,31 @@ export default function CompanyPage({ session }) {
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
   const [ledger, setLedger] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [services, setServices] = useState({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
   useEffect(() => {
-    const subs = [watchTeams(setTeams), watchAllUsers(setUsers)];
+    const subs = [watchTeams(setTeams), watchAllUsers(setUsers), watchCorpServices(setServices)];
     return () => subs.forEach((u) => u());
   }, []);
 
+  // 대표면 집행 화면, 팀원이면 같은 탭에서 읽기 전용 장부 화면.
+  //   ★팀원 열람은 투명성 견제 장치★ — CEO 지출을 팀원이 볼 수 있어야 금고 감시가 성립한다.
+  //   teamLedger·corpOrders 는 규칙상 이미 공개 읽기라 별도 권한 작업이 필요 없다.
   const company = useMemo(
-    () => teams.find((c) => c.ceoUserId === session.userId) || null,
+    () => teams.find((c) => c.ceoUserId === session.userId)
+      || teams.find((c) => Array.isArray(c.members) && c.members.includes(session.userId))
+      || null,
     [teams, session.userId],
   );
+  const isCeo = !!company && company.ceoUserId === session.userId;
 
   useEffect(() => {
     if (!company) return undefined;
-    return watchTeamLedger(company.id, setLedger);
+    const subs = [watchTeamLedger(company.id, setLedger), watchCorpOrders(company.id, setOrders)];
+    return () => subs.forEach((u) => u());
   }, [company?.id]);
 
   const nameOf = (id) => users.find((u) => u.id === id)?.name || id;
@@ -50,6 +70,7 @@ export default function CompanyPage({ session }) {
   const [bonusTo, setBonusTo] = useState('');
   const [bonusAmt, setBonusAmt] = useState('');
   const [perShare, setPerShare] = useState('');
+  const [orderNote, setOrderNote] = useState('');
 
   async function run(fn, okText) {
     setBusy(true); setMsg(null);
@@ -62,7 +83,7 @@ export default function CompanyPage({ session }) {
     return (
       <div className="block">
         <h3>내 회사</h3>
-        <p className="emptyline">대표(CEO)로 등록된 회사가 없어요. 운영자가 회사를 만들면 여기에 표시됩니다.</p>
+        <p className="emptyline">소속된 회사가 없어요. 운영자가 팀에 배정하면 여기에 표시됩니다.</p>
       </div>
     );
   }
@@ -80,13 +101,20 @@ export default function CompanyPage({ session }) {
         <div className="net">{(company.corpBalance || 0).toLocaleString()}</div>
         <div className="currencies">
           <div className="cur"><div className="lab">사명</div><div className="val" style={{ fontSize: 16 }}>{company.name}</div></div>
-          <div className="cur"><div className="lab">대표</div><div className="val" style={{ fontSize: 16 }}>{session.name}</div></div>
+          <div className="cur"><div className="lab">대표</div><div className="val" style={{ fontSize: 16 }}>{nameOf(company.ceoUserId)}</div></div>
           <div className="cur"><div className="lab">팀원</div><div className="val">{members.length}</div></div>
         </div>
       </section>
 
       {msg && <p className={msg.ok ? 'okline' : 'err'}>{msg.text}</p>}
 
+      {!isCeo && (
+        <p className="muted" style={{ marginTop: 0 }}>
+          👀 <b>팀원 열람</b> — 회사 금고와 지출 내역을 볼 수 있습니다. 집행은 대표({nameOf(company.ceoUserId)})만 가능합니다.
+        </p>
+      )}
+
+      {isCeo && <>
       <section className="block">
         <h3>주급 집행 · 소득세 {TAX_PCT}% 원천징수</h3>
         {paidThisWeek
@@ -150,6 +178,61 @@ export default function CompanyPage({ session }) {
       </section>
 
       <section className="block">
+        <h3>팀 포인트 교환소</h3>
+        <p className="muted" style={{ marginTop: 0 }}>
+          구매 대금은 금고에서 <b>소각</b>됩니다(팀원 지갑으로 가지 않음). 납품이 끝나면 운영자가 이행 처리하고,
+          들어드릴 수 없는 주문은 거부되어 <b>금고로 환불</b>됩니다.
+        </p>
+        {Object.keys(services).length === 0 && <p className="emptyline">가격표가 아직 설정되지 않았어요.</p>}
+        {['T1', 'T2', 'T3'].map((tier) => {
+          const items = Object.entries(services).filter(([, s]) => s.tier === tier);
+          if (!items.length) return null;
+          return (
+            <div key={tier} style={{ marginTop: 10 }}>
+              <div className="cap">{TIER_LABEL[tier] || tier}</div>
+              {items.map(([key, s]) => {
+                const afford = (company.corpBalance || 0) >= s.price;
+                return (
+                  <div className="payrow" key={key}>
+                    <span className="pname" title={s.desc}>{s.name} <span className="muted">· {s.phase}</span></span>
+                    <span className="pnet mono">{s.price.toLocaleString()}</span>
+                    <button disabled={busy || !afford}
+                      onClick={() => run(
+                        () => redeemCorpService({ stockId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, service: key, params: { note: orderNote } }),
+                        (r) => (r.status === 'fulfilled'
+                          ? `${s.name} 체결 — ${r.cost.toLocaleString()} 소각${r.effect ? ' · 뉴스 게시됨' : ''}`
+                          : `${s.name} 접수 — ${r.cost.toLocaleString()} 소각. 운영자 확인을 기다립니다.`),
+                      ).then(() => setOrderNote(''))}>
+                      {afford ? '구매' : '금고 부족'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        <input style={{ width: '100%', marginTop: 8 }} placeholder="요청사항(선택) — 주제·마감·참고 링크 등"
+          value={orderNote} onChange={(e) => setOrderNote(e.target.value)} />
+      </section>
+      </>}
+
+      <section className="block">
+        <h3>주문 현황</h3>
+        {orders.length === 0 && <p className="emptyline">아직 주문이 없어요.</p>}
+        <ul className="stamps">
+          {orders.map((o) => (
+            <li key={o.id}>
+              <span className={`badge ${ORDER_BADGE[o.status] || 'st-open'}`}>{ORDER_LABEL[o.status] || o.status}</span>
+              <span className="stitle">
+                {o.serviceName || o.service} · {(o.cost || 0).toLocaleString()}
+                {o.status === 'rejected' && o.reason ? ` — 거부 사유: ${o.reason}` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="block">
         <h3>회사 원장 (공개)</h3>
         {ledger.length === 0 && <p className="emptyline">아직 기록이 없어요.</p>}
         <ul className="stamps">
@@ -161,7 +244,11 @@ export default function CompanyPage({ session }) {
                 {e.type === 'bonus' && `상여 ${(e.amount || 0).toLocaleString()}${e.tax ? ` (세금 ${e.tax.toLocaleString()})` : ''} → ${nameOf(e.userId)}`}
                 {e.type === 'team_dividend' && `배당 주당 ${(e.perShare || 0).toLocaleString()} · 총 ${(e.total || 0).toLocaleString()}`}
                 {e.type === 'grant' && `금고 충전 ${(e.amount || 0).toLocaleString()} ${e.memo ? `· ${e.memo}` : ''}`}
-                {e.type === 'redeem' && `교환 ${e.service} −${(e.cost || 0).toLocaleString()}`}
+                {e.type === 'redeem' && `교환소 구매 ${e.serviceName || e.service} −${(e.cost || 0).toLocaleString()} (소각)`}
+                {e.type === 'redeem_fulfilled' && `납품 완료 ${e.serviceName || e.service}`}
+                {e.type === 'redeem_refund' && `주문 거부 환불 ${e.serviceName || e.service} +${(e.amount || 0).toLocaleString()}${e.reason ? ` · ${e.reason}` : ''}`}
+                {e.type === 'offer_subscribe' && `유상증자 청약 ${nameOf(e.userId)} ${e.qty}주 +${(e.amount || 0).toLocaleString()}`}
+                {e.type === 'offer_buyback' && `신주 환매 ${nameOf(e.userId)} ${e.qty}주 −${(e.amount || 0).toLocaleString()}`}
               </span>
             </li>
           ))}
