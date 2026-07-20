@@ -1,14 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  watchTeams, watchAllUsers, watchTeamLedger, watchCorpServices, watchCorpOrders,
-  paySalary, payBonus, payTeamDividend, redeemCorpService,
+  watchTeams, watchAllUsers, watchTeamLedger, watchCorpOrders,
+  paySalary, payBonus, payTeamDividend,
 } from './data.js';
 
-const TIER_LABEL = {
-  T1: 'T1 · 까미 노동',
-  T2: 'T2 · 강사 직접',
-  T3: 'T3 · 까미 비전스 계약',
-};
 const ORDER_LABEL = { pending: '대기', fulfilled: '완료', rejected: '거부' };
 const ORDER_BADGE = { pending: 'st-open', fulfilled: 'st-done', rejected: 'st-off' };
 
@@ -33,12 +28,11 @@ export default function CompanyPage({ session }) {
   const [users, setUsers] = useState([]);
   const [ledger, setLedger] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [services, setServices] = useState({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
   useEffect(() => {
-    const subs = [watchTeams(setTeams), watchAllUsers(setUsers), watchCorpServices(setServices)];
+    const subs = [watchTeams(setTeams), watchAllUsers(setUsers)];
     return () => subs.forEach((u) => u());
   }, []);
 
@@ -70,7 +64,6 @@ export default function CompanyPage({ session }) {
   const [bonusTo, setBonusTo] = useState('');
   const [bonusAmt, setBonusAmt] = useState('');
   const [perShare, setPerShare] = useState('');
-  const [orderNote, setOrderNote] = useState('');
 
   async function run(fn, okText) {
     setBusy(true); setMsg(null);
@@ -177,47 +170,11 @@ export default function CompanyPage({ session }) {
         )}
       </section>
 
-      <section className="block">
-        <h3>팀 포인트 교환소</h3>
-        <p className="muted" style={{ marginTop: 0 }}>
-          구매 대금은 금고에서 <b>소각</b>됩니다(팀원 지갑으로 가지 않음). 납품이 끝나면 운영자가 이행 처리하고,
-          들어드릴 수 없는 주문은 거부되어 <b>금고로 환불</b>됩니다.
-        </p>
-        {Object.keys(services).length === 0 && <p className="emptyline">가격표가 아직 설정되지 않았어요.</p>}
-        {['T1', 'T2', 'T3'].map((tier) => {
-          const items = Object.entries(services).filter(([, s]) => s.tier === tier);
-          if (!items.length) return null;
-          return (
-            <div key={tier} style={{ marginTop: 10 }}>
-              <div className="cap">{TIER_LABEL[tier] || tier}</div>
-              {items.map(([key, s]) => {
-                const afford = (company.corpBalance || 0) >= s.price;
-                return (
-                  <div className="payrow" key={key}>
-                    <span className="pname" title={s.desc}>{s.name} <span className="muted">· {s.phase}</span></span>
-                    <span className="pnet mono">{s.price.toLocaleString()}</span>
-                    <button disabled={busy || !afford}
-                      onClick={() => run(
-                        () => redeemCorpService({ stockId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, service: key, params: { note: orderNote } }),
-                        (r) => (r.status === 'fulfilled'
-                          ? `${s.name} 체결 — ${r.cost.toLocaleString()} 소각${r.effect ? ' · 뉴스 게시됨' : ''}`
-                          : `${s.name} 접수 — ${r.cost.toLocaleString()} 소각. 운영자 확인을 기다립니다.`),
-                      ).then(() => setOrderNote(''))}>
-                      {afford ? '구매' : '금고 부족'}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-        <input style={{ width: '100%', marginTop: 8 }} placeholder="요청사항(선택) — 주제·마감·참고 링크 등"
-          value={orderNote} onChange={(e) => setOrderNote(e.target.value)} />
-      </section>
       </>}
 
       <section className="block">
         <h3>주문 현황</h3>
+        <p className="muted" style={{ marginTop: 0 }}>구매는 <b>DP 교환소 → [팀 교환]</b> 탭에서 합니다. 여기서는 진행 상황만 봅니다.</p>
         {orders.length === 0 && <p className="emptyline">아직 주문이 없어요.</p>}
         <ul className="stamps">
           {orders.map((o) => (
