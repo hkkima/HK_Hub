@@ -248,12 +248,26 @@
 | 상여 | **15%** | housePool (수시 지급을 더 무겁게 → 정기급여 우대) |
 | 자체 배당 | 0% | — |
 
-## 13. 미구현 — 유상증자 `subscribeShares`
-
-설계 확정, 코드 없음. 다음 작업.
+## 13. 유상증자 `subscribeShares` — ✅ 구현·배포 완료 (2026-07-20)
 
 - **팀원만 참여** (일반 매수는 멤버 차단이라 자사주 획득의 유일 경로)
-- 대금 **전액 팀 금고** · 신주 **3일 락업**
+- 대금 **전액 팀 금고**(`corpBalance`) · 신주 **3일 락업**(`OFFER_LOCK_MS`)
 - **★(가)안 회사 환매책임★**: 유상증자분 매도 시 리저브가 아니라 **금고에서 지급**(금고 부족하면 매도 불가)
   - 이유: 전액 금고로 보내면 신주가 무담보 → 매도 시 housePool이 대납해 **드레인 루프**(100주 사이클당 약 −139K)
-- 구현: `holdings.offerShares` / `offerUnlockAt` 추가 + `trade` 매도 경로 분기
+
+### 구현 형태
+
+| 항목 | 내용 |
+|---|---|
+| 신규 필드 | `holdings.offerShares`(신주 잔량) · `holdings.offerUnlockAt`(ms epoch, 재청약 시 `max`로 연장) |
+| 청약 | `subscribeShares` — 지갑 −cost, **`corpBalance` +cost**, `circulating`·`price` 갱신, **`reserve` 불변**(무담보) |
+| 매도 분기 | `trade`: **일반주 우선 소진**(곡선 상단) → 부족분만 신주(곡선 하단). `normalProceeds`는 reserve, `offerProceeds`는 **금고**에서 지급 |
+| 거부 조건 | 락업 중 매도 불가 · `corpBalance < offerProceeds` 이면 매도 거부 |
+| 원장 | `trades`/`ledger`(`type:'subscribe'`) + `teamLedger`(`offer_subscribe` / `offer_buyback`) |
+| 수수료 | 매도 2%는 기존대로 전체 proceeds 기준 → housePool |
+| UI | 마켓 거래 패널: 팀원에게는 매수 버튼 대신 **[청약(유상증자)]**, 락업 잔량·해제시각 표기 |
+
+### 회계 검증
+
+`test-harness/offer_conservation.mjs`(Firestore 불요, 순수 계산) — 청약·일반매수·신주매도 10사이클에서
+**총량보존 차 0**, **housePool 변화 = 매도수수료 수입뿐(드레인 0)** 확인. 환매 손익은 전액 팀 금고가 부담.
