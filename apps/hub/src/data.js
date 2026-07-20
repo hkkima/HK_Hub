@@ -1,13 +1,22 @@
 // 공유 데이터 읽기 — 전부 공개 읽기(rules). 쓰기는 각 앱/함수가 담당, 허브는 읽기만.
 import {
-  doc, collection, getDoc, onSnapshot, query, where, orderBy, limit,
+  doc, collection, getDoc, getDocs, onSnapshot, query, where, orderBy, limit,
 } from 'firebase/firestore';
 import { db, callable } from './firebase.js';
 
-// 로그인용: 이름 슬러그로 user 문서 1건 조회(공개 읽기).
-export async function fetchUser(userId) {
+// 로그인용 조회(공개 읽기).
+//   ⚠ 문서 ID가 항상 이름 슬러그인 건 아니다(예: 박지수=pj15oo, 이유진=yoojin).
+//   ① 슬러그 ID로 직접 조회 → ② 없으면 name 필드로 쿼리 폴백. HK_Stock 의 getUserByName 과 동일 취지.
+export async function fetchUser(userId, rawName) {
   const snap = await getDoc(doc(db(), 'users', userId));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  if (snap.exists()) return { id: snap.id, ...snap.data() };
+
+  const nm = String(rawName ?? userId).trim();
+  if (!nm) return null;
+  const qs = await getDocs(query(collection(db(), 'users'), where('name', '==', nm)));
+  if (qs.empty) return null;
+  const d = qs.docs[0];
+  return { id: d.id, ...d.data() };
 }
 
 // 내 포인트(users/{id}.balance) 실시간 구독.

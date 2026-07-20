@@ -125,10 +125,11 @@ function Login({ onLogin }) {
     try {
       const userId = nameToUserId(name);
       if (!userId) { setErr('이름을 입력하세요.'); return; }
-      const user = await fetchUser(userId);
+      const user = await fetchUser(userId, name); // ID 조회 실패 시 name 필드로 폴백
       if (!user) { setErr('등록되지 않은 이름이에요. 증권가/베팅판에서 먼저 가입했는지 확인하세요.'); return; }
       if (!verifyPin(pin, user.pinHash)) { setErr('PIN이 맞지 않아요.'); return; }
-      onLogin({ userId, name: user.name || name, pinHash: user.pinHash });
+      // ★ 세션의 userId 는 반드시 '실제 문서 ID'(user.id) — 슬러그와 다를 수 있다(예: 박지수=pj15oo).
+      onLogin({ userId: user.id, name: user.name || name, pinHash: user.pinHash });
     } catch (e2) {
       setErr('로그인 처리 중 오류: ' + (e2?.message || e2));
     } finally { setBusy(false); }
