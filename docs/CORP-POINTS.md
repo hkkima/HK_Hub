@@ -71,7 +71,7 @@
 ## 5. 거버넌스 = CEO 1인 + 투명성 견제
 
 - 지출은 CEO만. 함수가 CEO 신원 검증.
-- 하드 거버넌스 대신 **공개 원장(companyLedger read:if true)** 으로 견제 — 모든 지출을 전 학급이 봄 → 사회적 책임이 규칙을 대신(기존 "학급 투명성" 패턴 재사용).
+- 하드 거버넌스 대신 **공개 원장(teamLedger read:if true)** 으로 견제 — 모든 지출을 전 학급이 봄 → 사회적 책임이 규칙을 대신(기존 "학급 투명성" 패턴 재사용).
 - 팀 배당도 CEO 결정 + 공개 로그.
 
 ## 6. 경제·무결성
@@ -82,11 +82,11 @@
 
 ## 7. 관리 대시보드 · 백엔드 접점
 
-- **신규 엔티티**: `companies/{id}` = `{ name(신규), ceoUserId, corpBalance, tier, ... }` + `companyLedger`. 개인 `users`와 분리.
+- **엔티티**: ★팀 = 주식★ — `stocks/{id}` 에 `ceoUserId`·`corpBalance` 를 더해 팀을 표현(별도 companies 없음). 원장은 `teamLedger`. 상장=팀 생성, 상폐=팀 해산(잔여 금고는 housePool 회수).
 - **재상장 이벤트 콘솔**(1회성 워크플로우): 프로젝트 순위 입력 → 배당 → **공정가 청산** → IPO 등록 → IR 순위 → 기업 포인트 지급.
   - ⚠️ **공정가 청산**이 최고 난도: 전 종목 `보유주×현재가`를 슬리피지 없이 개인 환수 + housePool 총량보존. 별도 1회성 정산 함수로 설계·검증 필요(자동 매도 아님).
 - **기업 포인트 집행**: 자동집행(까미 노동·팀배당=함수) vs 강사 수동승인(강사개입·리소스·까미 엔도스먼트=승인 큐). 의뢰소 `helpRequests` 승인 패턴 재사용.
-- **공개 원장 뷰**: companyLedger를 학급이 볼 수 있게(투명성 견제).
+- **공개 원장 뷰**: teamLedger를 학급이 볼 수 있게(투명성 견제).
 
 ## 8. 경제 순환 모델 (전체 설계)
 
@@ -158,28 +158,28 @@
 
 ## 11. 팀 경제 시스템 명세 (구현 대상)
 
-재상장 후 활성화. 전제: `companies/{id}`(사명·ceoUserId·corpBalance·members·stockId) + `companyLedger`(공개). 모든 지출은 **CEO만**(함수가 ceo 검증) + **공개 원장**. 잔고 변경은 `FieldValue.increment`.
+재상장 후 활성화. 전제: ★팀 = 주식★ — `stocks/{id}`(name·team·members·**ceoUserId**·**corpBalance**) + `teamLedger`(공개). 상장·대표·팀원 지정은 HK_Stock 관리자(upsertStock), 금고 충전·지급은 허브. 모든 지출은 **CEO만**(함수가 ceo 검증) + **공개 원장**. 잔고 변경은 `FieldValue.increment`.
 
 | # | 시스템 | 주체 | 효과 | 세금 | 집행 | 상태 |
 |---|---|---|---|---|---|---|
 | 1 | **주급** | CEO→팀원 | 팀 금고 → 팀원 개인 포인트(정기, 주 마무리) | **소득세 10%** 원천징수 → housePool | 함수(자동) | 구현 |
-| 2 | **상여** | CEO→팀원 | 팀 금고 → 팀원 개인 포인트(수시) | 없음(우선) | 함수(자동) | 구현 |
-| 3 | **세금** | 시스템 | 주급의 10%를 housePool로 원천징수 | — | 주급 함수 내장 | 구현 |
+| 2 | **상여** | CEO→팀원 | 팀 금고 → 팀원 개인 포인트(수시) | **소득세 15%** → housePool | 함수(자동) | 구현 |
+| 3 | **세금** | 시스템 | 주급 10% · 상여 15% 를 housePool로 원천징수 | — | 지급 함수 내장 | 구현 |
 | 4 | **자체 배당** | CEO→주주 | 팀 금고 → 자사주 보유자(perShare×shares) | 없음(우선) | 함수(자동) | 구현 |
 | 5 | **스톡옵션(개선)** | CEO→팀원 | 베스팅·행사 설계 개선 | — | — | **설계만** |
 | 6 | **팀 포인트 교환소** | CEO | 팀 금고 소각 → 까미/강사 서비스 | — | 자동+강사승인 혼합 | 구현 |
 
 ### 11.1 주급 + 소득세 (핵심)
-- `paySalary({companyId, ceoPinHash, payments:[{userId, gross}]})` — 각 팀원에게 gross 지급 시 **10% 원천징수**: 팀원 `+gross×0.9`, housePool `+gross×0.1`, 팀 금고 `−gross`. 원장에 gross/tax 기록.
+- `paySalary({stockId, ceoUserId, pinHash, payments:[{userId, gross}]})` — 각 팀원에게 gross 지급 시 **10% 원천징수**: 팀원 `+gross×0.9`, housePool `+gross×0.1`, 팀 금고 `−gross`. 원장에 gross/tax 기록.
 - **세금이 housePool로 감** → 리셋으로 생긴 **housePool −296K 적자를 점진 회수**하는 자연 장치(설계 보너스).
 - 주 마무리 정기 지급. 금고 부족 시 실패(체불 압박).
 
 ### 11.2 상여 / 자체 배당
-- `payBonus({companyId, ceoPinHash, userId, amount})` — 수시, 세금 없음(우선).
-- `payTeamDividend({companyId, ceoPinHash, perShare})` — 자사주 보유자에게 `perShare×shares` 지급(팀 금고 재원). **자사주 보유 동기** ↑. 세금 없음(우선).
+- `payBonus({stockId, ceoUserId, pinHash, userId, amount})` — 수시. **소득세 15% 원천징수**(정기급여인 주급 10%보다 높게 → 정기 지급 우대). 팀원 `+amount×0.85`, housePool `+amount×0.15`.
+- `payTeamDividend({stockId, ceoUserId, pinHash, perShare})` — 자사주 보유자에게 `perShare×shares` 지급(팀 금고 재원). **자사주 보유 동기** ↑. 세금 없음(우선).
 
 ### 11.3 팀 포인트 교환소 (②소각)
-- `redeemCorpService({companyId, ceoPinHash, service, params})` — 팀 금고 차감 + 이행 레코드 생성.
+- `redeemCorpService({stockId, ceoUserId, pinHash, service, params})` — 팀 금고 차감 + 이행 레코드 생성.
   - **까미 일일 고용**(work 대행) · **까미 테스터 계약**(유저테스트) · **강사 지원 계약**(컨설팅/리뷰) 등.
   - 자동집행(까미) vs 강사 수동승인(강사지원) 혼합 — 의뢰소 `helpRequests` 승인 큐 패턴 재사용.
   - 가격표 = 소각 다이얼(§9).

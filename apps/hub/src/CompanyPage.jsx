@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { watchTeams, watchAllUsers, watchTeamLedger, paySalary, payBonus, payTeamDividend } from './data.js';
 
-const TAX_PCT = 10; // 주급 소득세(함수와 동일)
+const TAX_PCT = 10;       // 주급 소득세(함수 SALARY_TAX_BPS 와 동일)
+const BONUS_TAX_PCT = 15; // 상여 소득세(함수 BONUS_TAX_BPS 와 동일)
 
 export default function CompanyPage({ session }) {
   const [teams, setTeams] = useState([]);
@@ -96,17 +97,20 @@ export default function CompanyPage({ session }) {
       </section>
 
       <section className="block">
-        <h3>상여 (무세)</h3>
+        <h3>상여 · 소득세 {BONUS_TAX_PCT}% 원천징수</h3>
         <div className="payrow">
           <select value={bonusTo} onChange={(e) => setBonusTo(e.target.value)}>
             <option value="">팀원 선택</option>
             {members.map((m) => <option key={m} value={m}>{nameOf(m)}</option>)}
           </select>
-          <input type="number" min="1" placeholder="금액" value={bonusAmt} onChange={(e) => setBonusAmt(e.target.value)} />
+          <input type="number" min="1" placeholder="금액(세전)" value={bonusAmt} onChange={(e) => setBonusAmt(e.target.value)} />
+          <span className="pnet">
+            {Number(bonusAmt) > 0 ? `실수령 ${Math.round(bonusAmt * (100 - BONUS_TAX_PCT) / 100).toLocaleString()}` : ''}
+          </span>
           <button disabled={busy || !bonusTo || !(Number(bonusAmt) > 0)}
             onClick={() => run(
               () => payBonus({ stockId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, userId: bonusTo, amount: Math.floor(Number(bonusAmt)) }),
-              (r) => `상여 ${r.amount.toLocaleString()} 지급 완료`,
+              (r) => `상여 지급 완료 — 세전 ${r.amount.toLocaleString()} (세금 ${r.tax.toLocaleString()}, 실수령 ${r.net.toLocaleString()})`,
             ).then(() => setBonusAmt(''))}>지급</button>
         </div>
       </section>
@@ -135,7 +139,7 @@ export default function CompanyPage({ session }) {
               <span className="badge st-open">{e.type}</span>
               <span className="stitle">
                 {e.type === 'salary' && `주급 ${(e.totalGross || 0).toLocaleString()} (세금 ${(e.totalTax || 0).toLocaleString()})`}
-                {e.type === 'bonus' && `상여 ${(e.amount || 0).toLocaleString()} → ${nameOf(e.userId)}`}
+                {e.type === 'bonus' && `상여 ${(e.amount || 0).toLocaleString()}${e.tax ? ` (세금 ${e.tax.toLocaleString()})` : ''} → ${nameOf(e.userId)}`}
                 {e.type === 'team_dividend' && `배당 주당 ${(e.perShare || 0).toLocaleString()} · 총 ${(e.total || 0).toLocaleString()}`}
                 {e.type === 'grant' && `금고 충전 ${(e.amount || 0).toLocaleString()} ${e.memo ? `· ${e.memo}` : ''}`}
                 {e.type === 'redeem' && `교환 ${e.service} −${(e.cost || 0).toLocaleString()}`}
