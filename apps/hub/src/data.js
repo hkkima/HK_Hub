@@ -62,18 +62,18 @@ export function watchAllUsers(cb) {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
 }
 
-// ── 팀 경제(기업 포인트) ────────────────────────────────
-// 전체 회사 목록 실시간 구독 (공개 읽기).
-export function watchCompanies(cb) {
-  return onSnapshot(collection(db(), 'companies'), (snap) =>
+// ── 팀 경제(팀 포인트) — ★팀 = 주식★ ────────────────────
+//   팀 정보(대표·금고·팀원)는 stocks/{id} 에 있다. 상장=팀 생성(HK_Stock 관리자), 상폐=팀 해산.
+export function watchTeams(cb) {
+  return onSnapshot(collection(db(), 'stocks'), (snap) =>
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
 }
 
-// 회사 원장(공개 — 학급 감시). 최근 30건.
+// 팀 원장(공개 — 학급 감시). 최근 30건.
 //   ⚠ where + orderBy 복합 쿼리는 Firestore 색인을 요구하므로 where 만 쓰고 정렬은 클라에서(색인 불필요).
-export function watchCompanyLedger(companyId, cb) {
+export function watchTeamLedger(stockId, cb) {
   return onSnapshot(
-    query(collection(db(), 'companyLedger'), where('companyId', '==', companyId)),
+    query(collection(db(), 'teamLedger'), where('stockId', '==', stockId)),
     (snap) => {
       const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       rows.sort((a, b) => (b.ts?.seconds || 0) - (a.ts?.seconds || 0));
@@ -83,13 +83,12 @@ export function watchCompanyLedger(companyId, cb) {
   );
 }
 
-// CEO 집행(익명인증) — 함수가 CEO 신원 + PIN 검증.
+// CEO 집행(익명인증) — 함수가 stocks.ceoUserId + PIN 검증.
 export const paySalary = callable('paySalary');
 export const payBonus = callable('payBonus');
 export const payTeamDividend = callable('payTeamDividend');
-// 운영자 집행(Google 로그인 필요) — assertAdmin.
-export const upsertCompany = callable('upsertCompany', { needAnon: false });
-export const grantCorpPoints = callable('grantCorpPoints', { needAnon: false });
+// 운영자 집행(Google 로그인 필요) — assertAdmin. 상장 자체는 HK_Stock 관리자에서.
+export const grantTeamPoints = callable('grantTeamPoints', { needAnon: false });
 
 // 종목 시세 맵 { stockId: { price, name } } — 평가액 계산용.
 export function watchStocks(cb) {

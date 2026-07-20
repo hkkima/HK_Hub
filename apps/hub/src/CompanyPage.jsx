@@ -1,28 +1,28 @@
 import { useState, useEffect, useMemo } from 'react';
-import { watchCompanies, watchAllUsers, watchCompanyLedger, paySalary, payBonus, payTeamDividend } from './data.js';
+import { watchTeams, watchAllUsers, watchTeamLedger, paySalary, payBonus, payTeamDividend } from './data.js';
 
 const TAX_PCT = 10; // 주급 소득세(함수와 동일)
 
 export default function CompanyPage({ session }) {
-  const [companies, setCompanies] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
   const [ledger, setLedger] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
   useEffect(() => {
-    const subs = [watchCompanies(setCompanies), watchAllUsers(setUsers)];
+    const subs = [watchTeams(setTeams), watchAllUsers(setUsers)];
     return () => subs.forEach((u) => u());
   }, []);
 
   const company = useMemo(
-    () => companies.find((c) => c.ceoUserId === session.userId) || null,
-    [companies, session.userId],
+    () => teams.find((c) => c.ceoUserId === session.userId) || null,
+    [teams, session.userId],
   );
 
   useEffect(() => {
     if (!company) return undefined;
-    return watchCompanyLedger(company.id, setLedger);
+    return watchTeamLedger(company.id, setLedger);
   }, [company?.id]);
 
   const nameOf = (id) => users.find((u) => u.id === id)?.name || id;
@@ -88,7 +88,7 @@ export default function CompanyPage({ session }) {
         )}
         <button className="primary" disabled={busy || salaryLines.length === 0}
           onClick={() => run(
-            () => paySalary({ companyId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, payments: salaryLines }),
+            () => paySalary({ stockId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, payments: salaryLines }),
             (r) => `주급 지급 완료 — 총 ${r.totalGross.toLocaleString()} (세금 ${r.totalTax.toLocaleString()}, 실수령 ${r.totalNet.toLocaleString()})`,
           ).then(() => setSalary({}))}>
           {busy ? '처리 중…' : '주급 지급'}
@@ -105,7 +105,7 @@ export default function CompanyPage({ session }) {
           <input type="number" min="1" placeholder="금액" value={bonusAmt} onChange={(e) => setBonusAmt(e.target.value)} />
           <button disabled={busy || !bonusTo || !(Number(bonusAmt) > 0)}
             onClick={() => run(
-              () => payBonus({ companyId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, userId: bonusTo, amount: Math.floor(Number(bonusAmt)) }),
+              () => payBonus({ stockId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, userId: bonusTo, amount: Math.floor(Number(bonusAmt)) }),
               (r) => `상여 ${r.amount.toLocaleString()} 지급 완료`,
             ).then(() => setBonusAmt(''))}>지급</button>
         </div>
@@ -113,13 +113,13 @@ export default function CompanyPage({ session }) {
 
       <section className="block">
         <h3>자체 배당 (자사주 보유자)</h3>
-        {!company.stockId && <p className="emptyline">상장 종목이 연결되지 않아 배당할 수 없어요.</p>}
-        {company.stockId && (
+        {!(company.circulating > 0) && <p className="emptyline">유통 중인 자사주가 없어 배당할 수 없어요.</p>}
+        {company.circulating > 0 && (
           <div className="payrow">
             <input type="number" min="1" placeholder="주당 배당액" value={perShare} onChange={(e) => setPerShare(e.target.value)} />
             <button disabled={busy || !(Number(perShare) > 0)}
               onClick={() => run(
-                () => payTeamDividend({ companyId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, perShare: Math.floor(Number(perShare)) }),
+                () => payTeamDividend({ stockId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, perShare: Math.floor(Number(perShare)) }),
                 (r) => `배당 완료 — ${r.count}명에게 총 ${r.total.toLocaleString()}`,
               ).then(() => setPerShare(''))}>배당</button>
           </div>

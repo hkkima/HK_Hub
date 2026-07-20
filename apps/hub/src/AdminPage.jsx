@@ -1,27 +1,25 @@
 import { useState, useEffect } from 'react';
 import { signInWithGoogle, watchAuth, isAdminEmail } from './firebase.js';
-import { watchCompanies, watchAllUsers, upsertCompany, grantCorpPoints } from './data.js';
+import { watchTeams, watchAllUsers, grantTeamPoints } from './data.js';
 
+// ★팀 = 주식★ — 상장(팀 생성)·대표/팀원 지정은 HK_Stock 관리자 화면에서 한다(upsertStock).
+//   여기서는 팀 금고(stocks.corpBalance) 충전과 현황만 다룬다.
 export default function AdminPage() {
   const [gUser, setGUser] = useState(null);
-  const [companies, setCompanies] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
   useEffect(() => {
     const off = watchAuth(setGUser);
-    const subs = [watchCompanies(setCompanies), watchAllUsers(setUsers)];
+    const subs = [watchTeams(setTeams), watchAllUsers(setUsers)];
     return () => { off?.(); subs.forEach((u) => u()); };
   }, []);
 
   const isAdmin = gUser && !gUser.isAnonymous && isAdminEmail(gUser.email);
   const nameOf = (id) => users.find((u) => u.id === id)?.name || id;
-
-  // 회사 생성 폼
-  const [f, setF] = useState({ companyId: '', name: '', ceoUserId: '', stockId: '', members: '' });
-  // 자본 배분 폼
-  const [g, setG] = useState({ companyId: '', amount: '', memo: '', source: 'house' });
+  const [g, setG] = useState({ stockId: '', amount: '', memo: '', source: 'house' });
 
   async function run(fn, okText) {
     setBusy(true); setMsg(null);
@@ -53,38 +51,14 @@ export default function AdminPage() {
       {msg && <p className={msg.ok ? 'okline' : 'err'}>{msg.text}</p>}
 
       <section className="block">
-        <h3>회사 생성 / 수정</h3>
+        <h3>팀 금고 충전 (순위 배당 · 초기자본)</h3>
+        <p className="muted" style={{ marginBottom: 10 }}>
+          팀 = 상장 종목입니다. <b>상장·대표·팀원 지정은 HK_Stock 관리자</b>에서 하고, 여기서는 금고만 충전합니다.
+        </p>
         <div className="formgrid">
-          <input placeholder="회사ID (예: team1)" value={f.companyId} onChange={(e) => setF({ ...f, companyId: e.target.value })} />
-          <input placeholder="사명" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-          <select value={f.ceoUserId} onChange={(e) => setF({ ...f, ceoUserId: e.target.value })}>
-            <option value="">대표(CEO) 선택</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.id}</option>)}
-          </select>
-          <input placeholder="상장 종목ID (선택)" value={f.stockId} onChange={(e) => setF({ ...f, stockId: e.target.value })} />
-          <input placeholder="팀원 userId 쉼표구분" value={f.members} onChange={(e) => setF({ ...f, members: e.target.value })} style={{ gridColumn: '1 / -1' }} />
-        </div>
-        <button className="primary" disabled={busy || !f.companyId || !f.name || !f.ceoUserId}
-          onClick={() => run(
-            () => upsertCompany({
-              companyId: f.companyId.trim(),
-              name: f.name.trim(),
-              ceoUserId: f.ceoUserId,
-              stockId: f.stockId.trim() || undefined,
-              members: f.members.split(',').map((s) => s.trim()).filter(Boolean),
-            }),
-            (r) => `${r.companyId} ${r.created ? '생성' : '수정'} 완료`,
-          )}>
-          {busy ? '처리 중…' : '저장'}
-        </button>
-      </section>
-
-      <section className="block">
-        <h3>금고 충전 (순위 배당 · 초기자본)</h3>
-        <div className="formgrid">
-          <select value={g.companyId} onChange={(e) => setG({ ...g, companyId: e.target.value })}>
-            <option value="">회사 선택</option>
-            {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <select value={g.stockId} onChange={(e) => setG({ ...g, stockId: e.target.value })}>
+            <option value="">팀(종목) 선택</option>
+            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
           <input type="number" placeholder="금액" value={g.amount} onChange={(e) => setG({ ...g, amount: e.target.value })} />
           <select value={g.source} onChange={(e) => setG({ ...g, source: e.target.value })}>
@@ -93,24 +67,24 @@ export default function AdminPage() {
           </select>
           <input placeholder="메모" value={g.memo} onChange={(e) => setG({ ...g, memo: e.target.value })} />
         </div>
-        <button className="primary" disabled={busy || !g.companyId || !Number(g.amount)}
+        <button className="primary" disabled={busy || !g.stockId || !Number(g.amount)}
           onClick={() => run(
-            () => grantCorpPoints({ companyId: g.companyId, amount: Math.floor(Number(g.amount)), memo: g.memo, source: g.source }),
-            (r) => `${r.companyId} 금고 ${r.amount.toLocaleString()} 충전 (${r.source})`,
+            () => grantTeamPoints({ stockId: g.stockId, amount: Math.floor(Number(g.amount)), memo: g.memo, source: g.source }),
+            (r) => `${r.stockId} 금고 ${r.amount.toLocaleString()} 충전 (${r.source})`,
           ).then(() => setG({ ...g, amount: '', memo: '' }))}>
           충전
         </button>
       </section>
 
       <section className="block">
-        <h3>회사 목록 ({companies.length})</h3>
-        {companies.length === 0 && <p className="emptyline">아직 회사가 없어요.</p>}
+        <h3>팀 현황 ({teams.length})</h3>
+        {teams.length === 0 && <p className="emptyline">상장된 팀이 없어요. HK_Stock 관리자에서 상장하세요.</p>}
         <ul className="stamps">
-          {companies.map((c) => (
-            <li key={c.id}>
-              <span className="badge st-go">{c.id}</span>
-              <span className="stitle">{c.name} · 대표 {nameOf(c.ceoUserId)} · 팀원 {c.members?.length || 0}</span>
-              <span className="greward">{(c.corpBalance || 0).toLocaleString()}</span>
+          {teams.map((t) => (
+            <li key={t.id}>
+              <span className={`badge ${t.ceoUserId ? 'st-go' : 'st-warn'}`}>{t.ceoUserId ? nameOf(t.ceoUserId) : '대표 미지정'}</span>
+              <span className="stitle">{t.name} · 팀원 {t.members?.length || 0} · 유통 {t.circulating || 0}주</span>
+              <span className="greward">금고 {(t.corpBalance || 0).toLocaleString()}</span>
             </li>
           ))}
         </ul>

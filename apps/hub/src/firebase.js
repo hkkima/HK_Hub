@@ -1,5 +1,5 @@
 // 허브 Firebase — 5앱과 같은 프로젝트(hk-chess-betting).
-//   읽기: users/dpAccounts/gigs/companies 등은 규칙상 공개 읽기라 인증 불필요.
+//   읽기: users/dpAccounts/gigs/stocks(=팀)/teamLedger 등은 규칙상 공개 읽기라 인증 불필요.
 //   쓰기: 전부 Cloud Functions 경유. CEO 기능=익명인증(assertAuth), 운영자 기능=Google 로그인(assertAdmin).
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
