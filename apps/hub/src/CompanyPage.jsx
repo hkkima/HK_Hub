@@ -4,6 +4,19 @@ import { watchTeams, watchAllUsers, watchTeamLedger, paySalary, payBonus, payTea
 const TAX_PCT = 10;       // 주급 소득세(함수 SALARY_TAX_BPS 와 동일)
 const BONUS_TAX_PCT = 15; // 상여 소득세(함수 BONUS_TAX_BPS 와 동일)
 
+// 급여 주 키 — ★HK_Stock functions/index.js payWeekKey 와 동일 로직 유지★
+//   경계 = 월요일 09:00(KST). 9시간 뒤로 민 뒤 ISO 주 키를 구하면 월 09:00 이 월 00:00 으로 정렬된다.
+function seoulWeekKey(d = new Date()) {
+  const s = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const day = (s.getDay() + 6) % 7;
+  s.setHours(0, 0, 0, 0);
+  s.setDate(s.getDate() - day + 3);
+  const firstThu = new Date(s.getFullYear(), 0, 4);
+  const week = 1 + Math.round(((s - firstThu) / 86400000 - 3 + ((firstThu.getDay() + 6) % 7)) / 7);
+  return `${s.getFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+const payWeekKey = (d = new Date()) => seoulWeekKey(new Date(d.getTime() - 9 * 60 * 60 * 1000));
+
 export default function CompanyPage({ session }) {
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
@@ -28,6 +41,9 @@ export default function CompanyPage({ session }) {
 
   const nameOf = (id) => users.find((u) => u.id === id)?.name || id;
   const members = company?.members?.length ? company.members : [];
+
+  // 주급은 1주 1회 — 팀 문서의 lastSalaryWeek 가 이번 급여 주와 같으면 소진.
+  const paidThisWeek = !!company && company.lastSalaryWeek === payWeekKey();
 
   // 주급 입력값 { userId: gross }
   const [salary, setSalary] = useState({});
@@ -73,6 +89,9 @@ export default function CompanyPage({ session }) {
 
       <section className="block">
         <h3>주급 집행 · 소득세 {TAX_PCT}% 원천징수</h3>
+        {paidThisWeek
+          ? <p className="emptyline">✅ 이번 주 주급은 이미 집행했습니다. 다음 <b>월요일 09:00</b> 이후 다시 지급할 수 있어요.</p>
+          : <p className="muted" style={{ marginTop: 0 }}>주급은 <b>한 주에 한 번</b>만 집행할 수 있습니다(경계 = 월요일 09:00). 한 번에 전원 몫을 함께 넣으세요.</p>}
         {members.length === 0 && <p className="emptyline">등록된 팀원이 없어요. 운영자에게 팀원 등록을 요청하세요.</p>}
         {members.map((m) => (
           <div className="payrow" key={m}>
@@ -87,7 +106,7 @@ export default function CompanyPage({ session }) {
             총 {totalGross.toLocaleString()} 지급 · 세금 {totalTax.toLocaleString()} · 실수령 합 {(totalGross - totalTax).toLocaleString()}
           </p>
         )}
-        <button className="primary" disabled={busy || salaryLines.length === 0}
+        <button className="primary" disabled={busy || salaryLines.length === 0 || paidThisWeek}
           onClick={() => run(
             () => paySalary({ stockId: company.id, ceoUserId: session.userId, pinHash: session.pinHash, payments: salaryLines }),
             (r) => `주급 지급 완료 — 총 ${r.totalGross.toLocaleString()} (세금 ${r.totalTax.toLocaleString()}, 실수령 ${r.totalNet.toLocaleString()})`,
