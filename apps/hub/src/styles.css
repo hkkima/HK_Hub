@@ -116,6 +116,26 @@ code { font-family: var(--font-mono); background: var(--surface-sunken); padding
 .cur .val { font-family: var(--font-mono); font-weight: 700; font-size: 22px; }
 .cur .val.gold { color: var(--accent-2); }
 
+/* 탭 네비 */
+.tabs { display: flex; gap: 8px; margin: 0 0 22px; }
+.tab { font-family: var(--font-display); font-weight: 700; font-size: 14px; padding: 8px 16px; }
+.tab.on { background: var(--surface-invert); color: var(--ink-on-invert); border-color: var(--line); }
+
+/* 폼 · 지급 행 */
+.formgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.formgrid input, .formgrid select, .payrow input, .payrow select {
+  padding: 9px 11px; border: var(--border); border-radius: var(--radius);
+  background: var(--surface-base); color: var(--ink-primary); font-family: var(--font-body); font-size: 14px;
+}
+.formgrid input:focus, .formgrid select:focus, .payrow input:focus, .payrow select:focus {
+  outline: none; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4.5px var(--accent-2);
+}
+.payrow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.payrow .pname { flex: 0 0 90px; font-weight: 600; }
+.payrow input, .payrow select { flex: 1; max-width: 200px; }
+.payrow .pnet { font-family: var(--font-mono); font-size: 12px; color: var(--ink-secondary); }
+.okline { color: var(--positive); font-size: 14px; font-weight: 600; }
+
 .block { margin-bottom: 30px; }
 .block h3 { font-family: var(--font-display); font-weight: 700; font-size: 15px; margin: 0 0 12px; letter-spacing: .03em; }
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }

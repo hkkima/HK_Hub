@@ -3,6 +3,8 @@ import { nameToUserId, verifyPin } from '@hk/shared';
 import { isConfigured } from './firebase.js';
 import { fetchUser, watchUser, watchDp, watchMyGigs, watchMyHoldings, watchStocks, watchMyHelp } from './data.js';
 import { APPS } from './apps.js';
+import CompanyPage from './CompanyPage.jsx';
+import AdminPage from './AdminPage.jsx';
 
 const SESSION_KEY = 'hkhub.session';
 
@@ -134,6 +136,7 @@ function Login({ onLogin }) {
 }
 
 function Dashboard({ session, onLogout }) {
+  const [view, setView] = useState('home');
   const [balance, setBalance] = useState(null);
   const [dp, setDp] = useState(null);
   const [gigs, setGigs] = useState([]);
@@ -164,6 +167,16 @@ function Dashboard({ session, onLogout }) {
     <div className="wrap">
       <Masthead session={session} onLogout={onLogout} />
 
+      <nav className="tabs">
+        {[['home', '홈'], ['company', '내 회사'], ['admin', '관리']].map(([k, label]) => (
+          <button key={k} className={view === k ? 'tab on' : 'tab'} onClick={() => setView(k)}>{label}</button>
+        ))}
+      </nav>
+
+      {view === 'company' && <CompanyPage session={session} />}
+      {view === 'admin' && <AdminPage />}
+
+      {view === 'home' && (<>
       <section className="ledger">
         <div className="cap">순자산 · Net Worth</div>
         <div className="net">{balance == null ? '…' : netWorth.toLocaleString()}</div>
@@ -197,6 +210,7 @@ function Dashboard({ session, onLogout }) {
           <Directory />
         </div>
       </div>
+      </>)}
     </div>
   );
 }

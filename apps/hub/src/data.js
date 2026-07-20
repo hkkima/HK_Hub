@@ -1,8 +1,8 @@
 // 공유 데이터 읽기 — 전부 공개 읽기(rules). 쓰기는 각 앱/함수가 담당, 허브는 읽기만.
 import {
-  doc, collection, getDoc, onSnapshot, query, where,
+  doc, collection, getDoc, onSnapshot, query, where, orderBy, limit,
 } from 'firebase/firestore';
-import { db } from './firebase.js';
+import { db, callable } from './firebase.js';
 
 // 로그인용: 이름 슬러그로 user 문서 1건 조회(공개 읽기).
 export async function fetchUser(userId) {
@@ -55,6 +55,41 @@ export function watchMyHoldings(userId, cb) {
     cb(mine);
   });
 }
+
+// 전체 사용자(이름 표시용) — 공개 읽기.
+export function watchAllUsers(cb) {
+  return onSnapshot(collection(db(), 'users'), (snap) =>
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
+
+// ── 팀 경제(기업 포인트) ────────────────────────────────
+// 전체 회사 목록 실시간 구독 (공개 읽기).
+export function watchCompanies(cb) {
+  return onSnapshot(collection(db(), 'companies'), (snap) =>
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
+
+// 회사 원장(공개 — 학급 감시). 최근 30건.
+//   ⚠ where + orderBy 복합 쿼리는 Firestore 색인을 요구하므로 where 만 쓰고 정렬은 클라에서(색인 불필요).
+export function watchCompanyLedger(companyId, cb) {
+  return onSnapshot(
+    query(collection(db(), 'companyLedger'), where('companyId', '==', companyId)),
+    (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => (b.ts?.seconds || 0) - (a.ts?.seconds || 0));
+      cb(rows.slice(0, 30));
+    },
+    (e) => { console.warn('원장 구독 실패:', e.code); cb([]); },
+  );
+}
+
+// CEO 집행(익명인증) — 함수가 CEO 신원 + PIN 검증.
+export const paySalary = callable('paySalary');
+export const payBonus = callable('payBonus');
+export const payTeamDividend = callable('payTeamDividend');
+// 운영자 집행(Google 로그인 필요) — assertAdmin.
+export const upsertCompany = callable('upsertCompany', { needAnon: false });
+export const grantCorpPoints = callable('grantCorpPoints', { needAnon: false });
 
 // 종목 시세 맵 { stockId: { price, name } } — 평가액 계산용.
 export function watchStocks(cb) {
