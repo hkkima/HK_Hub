@@ -15,7 +15,12 @@
    - 베팅 = 함수 없이 규칙-only
 4. **admin 게이트 일원화.** `VITE_ADMIN_EMAILS`(env) + 규칙 `isAdmin()` 한 소스. 현재 `jetsomk22@gmail.com`.
 5. **운영 PM은 툴 화이트리스트 밖 행동 불가.** 임의 Firestore 쓰기 금지, 되돌리기 어려운 액션은 사전 확인 + 감사 로그.
-6. **비파괴 마이그레이션.** 기존 5개 배포는 흡수 완료 전까지 살아있게. STEP은 독립 배포·롤백 가능.
+6. **비파괴 마이그레이션.** 기존 5개 배포는 그대로 살아있게. 각 단계는 독립 배포·롤백 가능.
+7. **총량보존 집합에 팀 금고를 포함한다.**
+   `Σ개인balance + Σstocks.corpBalance + Σstocks.reserve + housePool + Σescrow = 불변`
+   → **상장폐지 시 잔여 `corpBalance`를 housePool로 회수**하지 않으면 포인트가 증발한다(`delistStock`에 반영됨).
+8. **잔고·housePool·금고는 `FieldValue.increment` 로만.** read-modify-write 금지(틱과 충돌).
+9. **계정 삭제 전 잔고를 housePool로 회수**할 것(`operator_clawback` 원장). 그냥 지우면 총량이 깨진다.
 
 ## 2. 공유 백엔드 (기존, 무변경)
 
@@ -24,14 +29,26 @@
 
 ### 컬렉션 지도
 ```
-users/{id}                     공유 지갑·신분
-meta/{docId}                   보드 설정 (betting board, stockBoard, dpExchange)
+users/{id}                     공유 지갑·신분 { name, pinHash, balance }
+meta/{docId}                   보드 설정 (stockBoard, dpExchange, corpServices, behaviorScores)
 markets/{id}/bets/{userId}     베팅
-stocks/ holdings/ trades/ ledger/ stockTraits/ scheduledNews/   주식
+stocks/ holdings/ trades/ ledger/ stockTraits/ scheduledNews/   주식 ★stocks = 팀★
+teamLedger/ corpOrders/                                         팀 경제(공개 원장·서비스 주문)
 dpAccounts/ dpGoods/ dpRedemptions/                             DP
 problems/ problemTests/ submissions/ solved/                    저지
-gigs/ helpRequests/                                             보드(외주/봉사)
+gigs/ helpRequests/ recruits/ profiles/                         보드(외주/봉사/모집)
 ```
+
+### ★팀 = 주식★ (2026-07-20 확정)
+별도 `companies` 컬렉션 **없음**. `stocks/{id}` 가 곧 팀:
+- `name`·`members`(기존) + **`ceoUserId`**(대표) + **`corpBalance`**(팀 금고)
+- **상장 = 팀 생성**(`upsertStock`) / **상장폐지 = 팀 해산**(`delistStock`)
+- 상장·대표·팀원 지정 = **HK_Stock 관리자** / 금고 충전·주급·상여·배당 = **허브**
+
+### ★사용자 조회 규칙★
+`users` 문서 ID가 **항상 이름 슬러그인 건 아니다** (예: 박지수=`pj15oo`, 이유진=`yoojin`).
+→ 로그인·조회는 **ID 조회 후 실패 시 `where('name','==',입력)` 폴백**. 세션에는 **실제 문서 ID**를 저장할 것
+(슬러그를 저장하면 `ceoUserId` 매칭과 CEO 함수 검증이 전부 실패한다).
 
 ### housePool 공유
 주식·DP·저지·봉사 4앱이 하우스풀을 공유. 적자 분석 시 **전 ledger type 집계 필수**(단일 앱만 보면 틀림). 감사 로직 = `audit_house.mjs`.
