@@ -1,10 +1,13 @@
 # HK 통합 플랫폼 (HK_Hub)
 
-수강생 포인트 경제(베팅·주식·저지·의뢰/보드·DP)의 **통합 진입점 + 운영 콘솔**.
+수강생 포인트 경제(베팅·주식·저지·의뢰/보드·DP·카지노·게임허브·홀덤)의 **통합 진입점 + 운영 콘솔**.
+
+> ★이 리포의 `docs/GOVERNANCE.md` · `docs/CONVENTIONS.md` 가 크로스-리포 기준의 정본★
+> 다른 리포 문서와 충돌하면 여기가 이긴다. 규칙 배포 도구 정본 = `tools/rules/`.
 
 라이브: **https://hkkima.github.io/HK_Hub/**
 
-백엔드는 이미 통합돼 있다 — 5앱 전부 같은 Firebase `hk-chess-betting` / 단일 Firestore / 공유 `users` 지갑.
+백엔드는 이미 통합돼 있다 — 8앱 전부 같은 Firebase `hk-chess-betting` / 단일 Firestore·RTDB / 공유 `users` 지갑.
 이 repo는 **허브(런처+대시보드)와 팀 경제 UI**를 담당한다. **각 앱은 흡수하지 않고 그대로 둔다.**
 
 ## 구조 (npm workspaces 모노레포)
