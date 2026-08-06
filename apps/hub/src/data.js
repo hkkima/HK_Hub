@@ -136,6 +136,25 @@ export const fulfillCorpOrder = callable('fulfillCorpOrder', { needAnon: false }
 export const rejectCorpOrder = callable('rejectCorpOrder', { needAnon: false });
 export const setCorpServices = callable('setCorpServices', { needAnon: false });
 
+// ── 운영자 지급 창구 — Hub 통합(PLAN-GRANT-CONSOLIDATION.md) ────
+//   P 지급: 서버 권위 grantPoints(balance↔housePool 상계 + ledger admin_grant).
+//   DP 지급: grantDP(dpAccounts increment + ledger dp_grant). 구 Betting/DP 화면은 철거.
+export const grantPoints = callable('grantPoints', { needAnon: false });
+export const grantDP = callable('grantDP', { needAnon: false });
+
+// 지급 이력(ledger, 공개 읽기) — admin_grant/dp_grant 만. 최근 30건, 정렬은 클라(색인 불필요).
+export function watchGrantLedger(cb) {
+  return onSnapshot(
+    query(collection(db(), 'ledger'), where('type', 'in', ['admin_grant', 'dp_grant'])),
+    (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => (b.ts?.seconds || 0) - (a.ts?.seconds || 0));
+      cb(rows.slice(0, 30));
+    },
+    (e) => { console.warn('지급 이력 구독 실패:', e.code); cb([]); },
+  );
+}
+
 // 종목 시세 맵 { stockId: { price, name } } — 평가액 계산용.
 export function watchStocks(cb) {
   return onSnapshot(collection(db(), 'stocks'), (snap) => {
