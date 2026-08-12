@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { signInWithGoogle, watchAuth, isAdminEmail } from './firebase.js';
 import {
-  watchTeams, watchAllUsers, watchPendingCorpOrders,
-  grantTeamPoints, fulfillCorpOrder, rejectCorpOrder,
+  watchTeams, watchAllUsers, watchPendingCorpOrders, watchGrantLedger,
+  grantTeamPoints, fulfillCorpOrder, rejectCorpOrder, grantPoints, grantDP,
 } from './data.js';
 
 // ★팀 = 주식★ — 상장(팀 생성)·대표/팀원 지정은 HK_Stock 관리자 화면에서 한다(upsertStock).
@@ -15,9 +15,11 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  const [grants, setGrants] = useState([]);
+
   useEffect(() => {
     const off = watchAuth(setGUser);
-    const subs = [watchTeams(setTeams), watchAllUsers(setUsers), watchPendingCorpOrders(setPending)];
+    const subs = [watchTeams(setTeams), watchAllUsers(setUsers), watchPendingCorpOrders(setPending), watchGrantLedger(setGrants)];
     return () => { off?.(); subs.forEach((u) => u()); };
   }, []);
 
@@ -25,6 +27,9 @@ export default function AdminPage() {
   const nameOf = (id) => users.find((u) => u.id === id)?.name || id;
   const teamName = (id) => teams.find((t) => t.id === id)?.name || id;
   const [g, setG] = useState({ stockId: '', amount: '', memo: '', source: 'house' });
+  const [p, setP] = useState({ userId: '', delta: '', memo: '' });         // P 개인 지급
+  const [pa, setPa] = useState({ delta: '', memo: '' });                   // P 전원 지급
+  const [dg, setDg] = useState({ ids: [], amount: '', memo: '' });         // DP 지급
 
   async function run(fn, okText) {
     setBusy(true); setMsg(null);
@@ -79,6 +84,81 @@ export default function AdminPage() {
           ).then(() => setG({ ...g, amount: '', memo: '' }))}>
           충전
         </button>
+      </section>
+
+      <section className="block">
+        <h3>P 지급/조정 (개인 · 전원)</h3>
+        <p className="muted" style={{ marginBottom: 10 }}>
+          지급분은 <b>housePool에서 나가고</b>, 음수(회수)는 housePool로 돌아갑니다(총량보존 — 발행이 아님).
+          순발행이 필요하면 HK_Stock 관리자에서 mint 후 지급하세요. 전 건 원장(<code>admin_grant</code>) 기록.
+        </p>
+        <div className="formgrid">
+          <select value={p.userId} onChange={(e) => setP({ ...p, userId: e.target.value })}>
+            <option value="">수강생 선택</option>
+            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.id}</option>)}
+          </select>
+          <input type="number" placeholder="증감 (음수=회수)" value={p.delta} onChange={(e) => setP({ ...p, delta: e.target.value })} />
+          <input placeholder="메모" value={p.memo} onChange={(e) => setP({ ...p, memo: e.target.value })} />
+        </div>
+        <button className="primary" disabled={busy || !p.userId || !Number(p.delta)}
+          onClick={() => run(
+            () => grantPoints({ userIds: [p.userId], delta: Math.floor(Number(p.delta)), memo: p.memo }),
+            (r) => `${nameOf(p.userId)} 에 ${r.delta > 0 ? '+' : ''}${r.delta.toLocaleString()}P`,
+          ).then(() => setP({ userId: '', delta: '', memo: '' }))}>
+          개인 지급
+        </button>
+        <div className="formgrid" style={{ marginTop: 10 }}>
+          <input type="number" placeholder="전원 증감 (음수=회수)" value={pa.delta} onChange={(e) => setPa({ ...pa, delta: e.target.value })} />
+          <input placeholder="메모" value={pa.memo} onChange={(e) => setPa({ ...pa, memo: e.target.value })} />
+        </div>
+        <button className="primary" disabled={busy || !Number(pa.delta)}
+          onClick={() => {
+            if (!window.confirm(`등록된 전원(${users.length}명)에게 각 ${pa.delta}P 를 적용합니다. 계속할까요?`)) return;
+            run(
+              () => grantPoints({ all: true, delta: Math.floor(Number(pa.delta)), memo: pa.memo }),
+              (r) => `전원 지급 완료 — ${r.count}명 × ${r.delta > 0 ? '+' : ''}${r.delta.toLocaleString()}P`,
+            ).then(() => setPa({ delta: '', memo: '' }));
+          }}>
+          전원 지급
+        </button>
+      </section>
+
+      <section className="block">
+        <h3>이벤트 DP 지급</h3>
+        <p className="muted" style={{ marginBottom: 10 }}>
+          DP는 별개 통화(housePool 무영향)입니다. 음수면 회수. 전 건 원장(<code>dp_grant</code>) 기록.
+          여러 명은 Ctrl/⌘ 클릭으로 선택하세요.
+        </p>
+        <div className="formgrid">
+          <select multiple size={6} value={dg.ids}
+            onChange={(e) => setDg({ ...dg, ids: [...e.target.selectedOptions].map((o) => o.value) })}>
+            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.id}</option>)}
+          </select>
+          <input type="number" placeholder="DP (음수=회수)" value={dg.amount} onChange={(e) => setDg({ ...dg, amount: e.target.value })} />
+          <input placeholder="메모" value={dg.memo} onChange={(e) => setDg({ ...dg, memo: e.target.value })} />
+        </div>
+        <button className="primary" disabled={busy || !dg.ids.length || !Number(dg.amount)}
+          onClick={() => run(
+            () => grantDP({ userIds: dg.ids, amount: Math.floor(Number(dg.amount)), memo: dg.memo }),
+            (r) => `${r.count}명에게 ${r.amount > 0 ? '+' : ''}${r.amount} DP`,
+          ).then(() => setDg({ ids: [], amount: '', memo: '' }))}>
+          DP 지급 ({dg.ids.length}명)
+        </button>
+      </section>
+
+      <section className="block">
+        <h3>지급 이력 (최근 {grants.length}건)</h3>
+        {grants.length === 0 && <p className="emptyline">지급 기록이 없어요.</p>}
+        {grants.map((r) => (
+          <div className="payrow" key={r.id}>
+            <span className="pname">
+              <span className={`badge ${r.type === 'admin_grant' ? 'st-go' : 'st-warn'}`}>{r.type === 'admin_grant' ? 'P' : 'DP'}</span>
+              {' '}{nameOf(r.userId)}{r.all ? ' (전원)' : ''}{r.memo ? <span className="muted"> — {r.memo}</span> : null}
+            </span>
+            <span className="pnet mono">{(r.amount || 0) > 0 ? '+' : ''}{(r.amount || 0).toLocaleString()}</span>
+            <span className="muted">{r.ts?.seconds ? new Date(r.ts.seconds * 1000).toLocaleString('ko-KR') : ''}</span>
+          </div>
+        ))}
       </section>
 
       <section className="block">

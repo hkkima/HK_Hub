@@ -1,30 +1,37 @@
 # 크로스-repo 규약 (HK 통합 플랫폼)
 
-> STEP 0 산출물. 5개 앱 + 허브/대시보드/shared 가 반드시 공유하는 불변식·경계·설정.
-> 아키텍처 전체는 [ARCHITECTURE.md](./ARCHITECTURE.md).
+> **8개 앱**(베팅·주식·DP·저지·보드·게임허브·카지노·홀덤) + 허브/대시보드/shared 가 공유하는 불변식·경계·설정.
+> 거버넌스(권위 소재·배포 절차·창구 일원화)는 [GOVERNANCE.md](./GOVERNANCE.md), 아키텍처는 [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## 1. 절대 불변식 (구현 중 어기지 않는다)
 
 1. **포인트(`users.balance`) 증가는 검증된 경로로만.** 인플레 차단이 시스템의 존재 이유.
    - 베팅: 참가자는 감소만, 증가는 운영자/규칙 검증
    - 주식·DP·저지·보드: 모든 증감은 Cloud Functions(Admin SDK)만. 신규 UI도 함수 경유
-2. **`firestore.rules`는 단일 권위 파일.** 앱별로 갈라 쓰지 않는다. 권위본 = `HK_Stock/firestore.rules`(상위집합). 변경 시 통합본 갱신 후 배포.
-3. **함수 codebase 경계 유지.**
-   - `default` = `HK_Stock/functions` → 주식 + 보드(gigs/help) + DP
+2. **규칙의 권위는 ★라이브 룰셋★이다 — 리포의 어떤 사본도 아니다.** (구 규약 "권위본 = HK_Stock 상위집합"은
+   2026-08-06 감사에서 사실이 아님이 확인돼 폐기 — 게임허브·카지노 12개 match 누락 상태였다.)
+   배포는 반드시 3단계(check-live → merge → deploy), 도구는 `HK_Hub/tools/rules/`. 상세 = GOVERNANCE.md §1.
+3. **함수 codebase 경계 유지.** (2026-08-06 갱신 — casino·gamehub 등재)
+   - `default` = `HK_Stock/functions` → 주식 + 보드(gigs/help/recruits) + 팀 경제 + DP + 홀덤
    - `judge` = `HK_Judge/functions` → 저지 전용
+   - `casino` = `HK_Gamble/functions` → 카지노 전용
+   - `gamehub` = `HK_GameHub/functions` → 게임허브 전용
    - 베팅 = 함수 없이 규칙-only
 4. **admin 게이트 일원화.** `VITE_ADMIN_EMAILS`(env) + 규칙 `isAdmin()` 한 소스. 현재 `jetsomk22@gmail.com`.
 5. **운영 PM은 툴 화이트리스트 밖 행동 불가.** 임의 Firestore 쓰기 금지, 되돌리기 어려운 액션은 사전 확인 + 감사 로그.
 6. **비파괴 마이그레이션.** 기존 5개 배포는 그대로 살아있게. 각 단계는 독립 배포·롤백 가능.
-7. **총량보존 집합에 팀 금고를 포함한다.**
-   `Σ개인balance + Σstocks.corpBalance + Σstocks.reserve + housePool + Σescrow = 불변`
+7. **총량보존 집합 (2026-08-06 확장 — 카지노·에스크로 그릇 등재)**
+   `Σ개인balance + Σstocks.corpBalance + Σstocks.reserve + housePool
+    + Σgigs.escrow + Σrecruits.escrow + ΣholdemGames.escrow
+    + ΣcasinoChips.chips + ΣcasinoRounds.escrow + meta/casinoBoard.jackpot = 불변`
    → **상장폐지 시 잔여 `corpBalance`를 housePool로 회수**하지 않으면 포인트가 증발한다(`delistStock`에 반영됨).
+   → ★칩은 별도 통화가 아니라 포인트 1:1 예치금★ — `users.balance` 는 환전(`casinoExchange`)할 때만 움직인다.
 8. **잔고·housePool·금고는 `FieldValue.increment` 로만.** read-modify-write 금지(틱과 충돌).
 9. **계정 삭제 전 잔고를 housePool로 회수**할 것(`operator_clawback` 원장). 그냥 지우면 총량이 깨진다.
 
 ## 2. 공유 백엔드 (기존, 무변경)
 
-- Firebase 프로젝트: **`hk-chess-betting`** (단일 Firestore, 5앱 공유)
+- Firebase 프로젝트: **`hk-chess-betting`** (단일 Firestore + RTDB, 8앱 공유)
 - 신분·지갑: `users/{id} = { name, pinHash, balance }` — balance = 공유 포인트, 로그인 name+PIN 공통
 
 ### 컬렉션 지도
@@ -37,6 +44,11 @@ teamLedger/ corpOrders/                                         팀 경제(공�
 dpAccounts/ dpGoods/ dpRedemptions/                             DP
 problems/ problemTests/ submissions/ solved/                    저지
 gigs/ helpRequests/ recruits/ profiles/                         보드(외주/봉사/모집)
+holdemGames/                                                    홀덤(에스크로 · 게임상태는 RTDB holdem/*)
+casinoChips/ casinoRounds/ casinoSeeds/ casinoReveals/          카지노(칩=1:1 예치금 · 라운드 에스크로)
+casinoResults/ casinoDaily/  meta/casinoBoard                   카지노(공개 결과·통계 · 잭팟)
+gamehub_games/(+likes) gamehub_users/ gamehub_payouts/          게임허브
+gamehub_instant/(+content)
 ```
 
 ### ★팀 = 주식★ (2026-07-20 확정)
@@ -51,7 +63,7 @@ gigs/ helpRequests/ recruits/ profiles/                         보드(외주/�
 (슬러그를 저장하면 `ceoUserId` 매칭과 CEO 함수 검증이 전부 실패한다).
 
 ### housePool 공유
-주식·DP·저지·봉사 4앱이 하우스풀을 공유. 적자 분석 시 **전 ledger type 집계 필수**(단일 앱만 보면 틀림). 감사 로직 = `audit_house.mjs`.
+주식·DP·저지·봉사·**카지노·홀덤** 이 하우스풀을 공유(게임허브도 등재 대상 — 현재 좋아요 보상이 무상계 발행이라 수정 필요, AUDIT-2026-08-06 P0-3). 적자 분석 시 **전 ledger type 집계 필수**(단일 앱만 보면 틀림). 감사 로직 = `HK_Stock/test-harness/audit_house.mjs` — 새 ledger type 을 만들면 같은 PR 에서 여기에 등재한다.
 
 ## 3. DP 환산 파라미터 (예산 편성)
 
