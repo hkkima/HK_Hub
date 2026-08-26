@@ -163,3 +163,33 @@ export function watchStocks(cb) {
     cb(map);
   });
 }
+
+// ── 수강생 현황판(운영자) ────────────────────────────────
+// 전원 DP 맵 { userId: dp } — dpAccounts 전체 구독(공개 읽기, 24명 규모라 부담 없음).
+export function watchAllDp(cb) {
+  return onSnapshot(collection(db(), 'dpAccounts'), (snap) => {
+    const map = {};
+    snap.docs.forEach((d) => { map[d.id] = d.data().dp || 0; });
+    cb(map);
+  }, (e) => { console.warn('DP 현황 구독 실패:', e.code); cb({}); });
+}
+
+// DP 교환 대기(pending) 건수 맵 { userId: n } — 현물 지급이 밀린 사람을 바로 본다.
+export function watchPendingRedemptions(cb) {
+  return onSnapshot(
+    query(collection(db(), 'dpRedemptions'), where('status', '==', 'pending')),
+    (snap) => {
+      const map = {};
+      snap.docs.forEach((d) => { const r = d.data(); map[r.userId] = (map[r.userId] || 0) + 1; });
+      cb(map);
+    },
+    (e) => { console.warn('교환 대기 구독 실패:', e.code); cb({}); },
+  );
+}
+
+// DP 파라미터(meta/dpExchange) — 현금 환산(krwPerDp)에 쓴다. 기본 500원/DP.
+export function watchDpParams(cb) {
+  return onSnapshot(doc(db(), 'meta', 'dpExchange'),
+    (snap) => cb(snap.exists() ? snap.data() : {}),
+    (e) => { console.warn('DP 파라미터 구독 실패:', e.code); cb({}); });
+}

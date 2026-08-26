@@ -185,3 +185,25 @@ code { font-family: var(--font-mono); background: var(--surface-sunken); padding
   .cols { grid-template-columns: 1fr; }
   .currencies { grid-template-columns: 1fr; }
 }
+
+/* ── 수강생 현황판 (Roster) ── */
+.rost-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.rost-sum .rs-cell {
+  background: var(--surface-raised); border: var(--border); box-shadow: var(--shadow-press); padding: 10px 12px;
+}
+.rost-sum .lab { font-size: 11px; letter-spacing: .06em; color: var(--ink-secondary); text-transform: uppercase; }
+.rost-sum .num { font-size: 19px; font-weight: 700; margin-top: 3px; }
+.rost-sum .warn-num { color: var(--gain); }
+
+.rost-wrap { overflow-x: auto; }
+table.rost { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.rost th, table.rost td { padding: 7px 9px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+table.rost th {
+  font-family: var(--font-display); font-size: 12px; letter-spacing: .05em;
+  color: var(--ink-secondary); border-bottom: 2px solid var(--line); white-space: nowrap;
+}
+table.rost td.num, table.rost th.num { text-align: right; }
+table.rost td.dim { color: var(--ink-secondary); }
+table.rost td.gold { color: var(--accent-2); font-weight: 700; }
+table.rost tbody tr:hover { background: var(--surface-raised); }
+table.rost .stamp { display: inline-block; transform: none; }
