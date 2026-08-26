@@ -5,6 +5,7 @@ import { fetchUser, watchUser, watchDp, watchMyGigs, watchMyHoldings, watchStock
 import { APPS } from './apps.js';
 import CompanyPage from './CompanyPage.jsx';
 import AdminPage from './AdminPage.jsx';
+import RosterPage from './RosterPage.jsx';
 
 const SESSION_KEY = 'hkhub.session';
 
@@ -95,12 +96,15 @@ export default function App() {
     <div className="wrap">
       <Masthead session={session} onLogout={logout} />
       <nav className="tabs">
-        {[['home', '홈'], ['company', '내 회사'], ['admin', '관리']].map(([k, label]) => (
+        {[['home', '홈'], ['company', '내 회사'], ['roster', '현황'], ['admin', '관리']].map(([k, label]) => (
           <button key={k} className={view === k ? 'tab on' : 'tab'} onClick={() => setView(k)}>{label}</button>
         ))}
       </nav>
 
       {view === 'admin' && <AdminPage />}
+
+      {/* 수강생 P/DP 현황 — 화면 안에서 운영자 Google 로그인을 요구한다(관리 탭과 동일 게이트). */}
+      {view === 'roster' && <RosterPage />}
 
       {view === 'company' && (session
         ? <CompanyPage session={session} />
