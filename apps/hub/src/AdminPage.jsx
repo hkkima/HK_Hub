@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { signInWithGoogle, watchAuth, isAdminEmail } from './firebase.js';
 import {
-  watchTeams, watchAllUsers, watchPendingCorpOrders, watchGrantLedger,
+  watchTeams, watchAllUsers, watchPendingCorpOrders, watchGrantLedger, watchAllDp,
   grantTeamPoints, fulfillCorpOrder, rejectCorpOrder, grantPoints, grantDP,
 } from './data.js';
+import PeoplePicker from './PeoplePicker.jsx';
 
 // ★팀 = 주식★ — 상장(팀 생성)·대표/팀원 지정은 HK_Stock 관리자 화면에서 한다(upsertStock).
 //   여기서는 팀 금고(stocks.corpBalance) 충전과 현황만 다룬다.
@@ -16,10 +17,14 @@ export default function AdminPage() {
   const [msg, setMsg] = useState(null);
 
   const [grants, setGrants] = useState([]);
+  const [dpMap, setDpMap] = useState({});
 
   useEffect(() => {
     const off = watchAuth(setGUser);
-    const subs = [watchTeams(setTeams), watchAllUsers(setUsers), watchPendingCorpOrders(setPending), watchGrantLedger(setGrants)];
+    const subs = [
+      watchTeams(setTeams), watchAllUsers(setUsers), watchPendingCorpOrders(setPending),
+      watchGrantLedger(setGrants), watchAllDp(setDpMap),
+    ];
     return () => { off?.(); subs.forEach((u) => u()); };
   }, []);
 
@@ -27,7 +32,7 @@ export default function AdminPage() {
   const nameOf = (id) => users.find((u) => u.id === id)?.name || id;
   const teamName = (id) => teams.find((t) => t.id === id)?.name || id;
   const [g, setG] = useState({ stockId: '', amount: '', memo: '', source: 'house' });
-  const [p, setP] = useState({ userId: '', delta: '', memo: '' });         // P 개인 지급
+  const [p, setP] = useState({ ids: [], delta: '', memo: '' });            // P 지급(다중)
   const [pa, setPa] = useState({ delta: '', memo: '' });                   // P 전원 지급
   const [dg, setDg] = useState({ ids: [], amount: '', memo: '' });         // DP 지급
 
@@ -87,25 +92,26 @@ export default function AdminPage() {
       </section>
 
       <section className="block">
-        <h3>P 지급/조정 (개인 · 전원)</h3>
+        <h3>P 지급/조정 (선택 · 전원)</h3>
         <p className="muted" style={{ marginBottom: 10 }}>
           지급분은 <b>housePool에서 나가고</b>, 음수(회수)는 housePool로 돌아갑니다(총량보존 — 발행이 아님).
           순발행이 필요하면 HK_Stock 관리자에서 mint 후 지급하세요. 전 건 원장(<code>admin_grant</code>) 기록.
         </p>
-        <div className="formgrid">
-          <select value={p.userId} onChange={(e) => setP({ ...p, userId: e.target.value })}>
-            <option value="">수강생 선택</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.id}</option>)}
-          </select>
+        <PeoplePicker
+          users={users} teams={teams} value={p.ids}
+          onChange={(ids) => setP({ ...p, ids })}
+          badgeOf={(u) => Math.round(u.balance || 0)} unit="P"
+        />
+        <div className="formgrid" style={{ marginTop: 10 }}>
           <input type="number" placeholder="증감 (음수=회수)" value={p.delta} onChange={(e) => setP({ ...p, delta: e.target.value })} />
           <input placeholder="메모" value={p.memo} onChange={(e) => setP({ ...p, memo: e.target.value })} />
         </div>
-        <button className="primary" disabled={busy || !p.userId || !Number(p.delta)}
+        <button className="primary" disabled={busy || !p.ids.length || !Number(p.delta)}
           onClick={() => run(
-            () => grantPoints({ userIds: [p.userId], delta: Math.floor(Number(p.delta)), memo: p.memo }),
-            (r) => `${nameOf(p.userId)} 에 ${r.delta > 0 ? '+' : ''}${r.delta.toLocaleString()}P`,
-          ).then(() => setP({ userId: '', delta: '', memo: '' }))}>
-          개인 지급
+            () => grantPoints({ userIds: p.ids, delta: Math.floor(Number(p.delta)), memo: p.memo }),
+            (r) => `${r.count}명에게 ${r.delta > 0 ? '+' : ''}${r.delta.toLocaleString()}P`,
+          ).then(() => setP({ ids: [], delta: '', memo: '' }))}>
+          선택한 {p.ids.length}명에게 지급
         </button>
         <div className="formgrid" style={{ marginTop: 10 }}>
           <input type="number" placeholder="전원 증감 (음수=회수)" value={pa.delta} onChange={(e) => setPa({ ...pa, delta: e.target.value })} />
@@ -127,13 +133,14 @@ export default function AdminPage() {
         <h3>이벤트 DP 지급</h3>
         <p className="muted" style={{ marginBottom: 10 }}>
           DP는 별개 통화(housePool 무영향)입니다. 음수면 회수. 전 건 원장(<code>dp_grant</code>) 기록.
-          여러 명은 Ctrl/⌘ 클릭으로 선택하세요.
+          이름을 눌러 켜고 끄고, 팀 단위로도 집을 수 있어요(오른쪽 숫자는 현재 보유 DP).
         </p>
-        <div className="formgrid">
-          <select multiple size={6} value={dg.ids}
-            onChange={(e) => setDg({ ...dg, ids: [...e.target.selectedOptions].map((o) => o.value) })}>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.id}</option>)}
-          </select>
+        <PeoplePicker
+          users={users} teams={teams} value={dg.ids}
+          onChange={(ids) => setDg({ ...dg, ids })}
+          badgeOf={(u) => dpMap[u.id] || 0} unit="DP"
+        />
+        <div className="formgrid" style={{ marginTop: 10 }}>
           <input type="number" placeholder="DP (음수=회수)" value={dg.amount} onChange={(e) => setDg({ ...dg, amount: e.target.value })} />
           <input placeholder="메모" value={dg.memo} onChange={(e) => setDg({ ...dg, memo: e.target.value })} />
         </div>
@@ -142,7 +149,7 @@ export default function AdminPage() {
             () => grantDP({ userIds: dg.ids, amount: Math.floor(Number(dg.amount)), memo: dg.memo }),
             (r) => `${r.count}명에게 ${r.amount > 0 ? '+' : ''}${r.amount} DP`,
           ).then(() => setDg({ ids: [], amount: '', memo: '' }))}>
-          DP 지급 ({dg.ids.length}명)
+          선택한 {dg.ids.length}명에게 DP 지급
         </button>
       </section>
 
